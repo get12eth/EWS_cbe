@@ -1,0 +1,11 @@
+fastapi
+uvicorn[standard]
+Jinja2==3.0.3
+pandas
+joblib
+python-multipart
+shap
+mysql-connector-python
+passlib[bcrypt]
+python-dotenv
+itsdangerous

@@ -19,6 +19,8 @@ import pickle
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
+import threading
+import time
 
 #Import new modules
 from etl_engine import ETLEngine
@@ -58,6 +60,33 @@ def get_db_connection():
     return mysql.connector.connect(host='localhost', user='root', password='Bant@6963', database='lon-default')
 
 
+def _get_user_info(username: str) -> Optional[Dict]:
+    """Return user record from users table or None if unavailable."""
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT username, role, is_active FROM users WHERE username = %s LIMIT 1", (username,))
+        user = cursor.fetchone()
+        cursor.close()
+        conn.close()
+        return user
+    except Exception:
+        return None
+
+
+def _require_roles(request: Request, allowed_roles: List[str]) -> Optional[Dict]:
+    """Check session user role against allowed_roles. Returns user dict if allowed, otherwise None."""
+    user = request.session.get('user')
+    if not user:
+        return None
+    info = _get_user_info(user)
+    if not info or not info.get('is_active'):
+        return None
+    if info.get('role') in allowed_roles:
+        return info
+    return None
+
+
 #Load .env and session secret
 load_dotenv()
 SESSION_SECRET = os.environ.get('SESSION_SECRET')
@@ -67,6 +96,15 @@ if not SESSION_SECRET:
     SESSION_SECRET = '4z_WvP9_nL6Wz5xR8qK2mJ-V1tY7bN4uX0iE3oP1aQ8'
 
 app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
+
+# Scheduler control event for background jobs
+scheduler_stop_event = threading.Event()
+
+# Interval (minutes) for SME alert population; configurable via env
+SME_POPULATE_INTERVAL_MINUTES = int(os.environ.get('SME_POPULATE_INTERVAL_MINUTES', '60'))
+# Lookback hours and probability threshold for SME population (configurable via env)
+SME_POPULATE_LOOKBACK_HOURS = int(os.environ.get('SME_POPULATE_LOOKBACK_HOURS', '24'))
+SME_POPULATE_THRESHOLD = float(os.environ.get('SME_POPULATE_THRESHOLD', '0.5'))
 
 # Initialize module engines
 db_config = {
@@ -272,6 +310,7 @@ if os.path.exists(cal_file):
 
 def prepare_model_input(customer_data):
     """Prepare customer data for model prediction using simplified encoding"""
+    
     try:
         #Create a copy to avoid modifying original data
         data = customer_data.copy()
@@ -308,7 +347,7 @@ def prepare_model_input(customer_data):
         data = data.rename(columns=column_mapping)
         
         
-        
+    
         #Fill missing categorical values with 'Unknown'
         categorical_cols = ['TENURE', 'TERM', 'LOAN_TYPE', 'LOAN_DESCRIPTION', 'LOAN_PRODUCT', 
                           'ECONOMIC_SECTOR', 'INDUSTRY', 'OWNERSHIP', 'SECTOR', 'TERM_OF_PAYMENT',
@@ -1146,9 +1185,64 @@ async def etl_process_file(file_path: str = Form(...)):
 @app.get('/api/alerts/dashboard')
 async def alerts_dashboard():
     """Get alerts dashboard"""
-    if not alerts_engine:
-        return {'error': 'Alerts engine not available'}
-    return alerts_engine.get_alerts_dashboard()
+    try:
+        if alerts_engine:
+            dashboard_data = alerts_engine.get_alerts_dashboard()
+            # Attach scheduler/config values so frontend can show current settings
+            dashboard_data['sme_scheduler'] = {
+                'interval_minutes': SME_POPULATE_INTERVAL_MINUTES,
+                'lookback_hours': SME_POPULATE_LOOKBACK_HOURS,
+                'threshold': SME_POPULATE_THRESHOLD
+            }
+            return dashboard_data
+        else:
+            return {'error': 'Alerts engine not available'}
+    except Exception as e:
+        logger.error(f"Failed to get alerts dashboard: {e}")
+        return {'error': str(e)}
+
+
+def _sme_populate_loop(interval_minutes: int = 60, lookback_hours: int = 24, threshold: float = 0.5):
+    """Daemon thread loop to periodically populate SME alerts.
+
+    interval_minutes: how often to run
+    lookback_hours: how far back to look at predictions
+    threshold: SME probability threshold
+    """
+    logger.info(f"SME populate scheduler starting (interval {interval_minutes} minutes, lookback {lookback_hours}h, threshold {threshold})")
+    try:
+        while not scheduler_stop_event.is_set():
+            try:
+                if alerts_engine:
+                    logger.info('Running scheduled SME alert population')
+                    alerts_engine.populate_sme_alerts(since_hours=lookback_hours, threshold=threshold)
+                else:
+                    logger.warning('Alerts engine not initialized; skipping scheduled SME populate')
+            except Exception as e:
+                logger.error(f"Scheduled SME populate failed: {e}")
+
+            # Wait with early exit support
+            scheduler_stop_event.wait(interval_minutes * 60)
+    finally:
+        logger.info('SME populate scheduler stopped')
+
+
+@app.on_event('startup')
+def _start_background_jobs():
+    # Start SME populate scheduler thread with configured lookback and threshold
+    t = threading.Thread(
+        target=_sme_populate_loop,
+        args=(SME_POPULATE_INTERVAL_MINUTES, SME_POPULATE_LOOKBACK_HOURS, SME_POPULATE_THRESHOLD),
+        daemon=True
+    )
+    t.start()
+    logger.info('Background SME populate thread started')
+
+
+@app.on_event('shutdown')
+def _stop_background_jobs():
+    scheduler_stop_event.set()
+    logger.info('Shutdown signal set for background jobs')
 
 @app.post('/api/alerts/rules')
 async def create_alert_rule(rule_data: dict):
@@ -1179,6 +1273,26 @@ async def check_alert_escalations():
     escalated_count = alerts_engine.check_alert_escalations()
     return {'escalated_count': escalated_count}
 
+
+@app.post('/api/alerts/populate-sme')
+async def api_populate_sme_alerts(since_hours: int = 24, threshold: float = 0.5):
+    """API wrapper to populate SME alerts from recent prediction results."""
+    if not alerts_engine:
+        return {'success': False, 'error': 'Alerts engine not available'}
+
+    try:
+        # create default SME rules if missing
+        try:
+            alerts_engine.create_default_sme_alert_rules()
+        except Exception:
+            pass
+
+        result = alerts_engine.populate_sme_alerts(since_hours=since_hours, threshold=threshold)
+        return result
+    except Exception as e:
+        logger.error(f"API populate-sme failed: {e}")
+        return {'success': False, 'error': str(e)}
+
 #Case Management Endpoints
 @app.get('/api/cases/dashboard')
 async def cases_dashboard():
@@ -1186,17 +1300,6 @@ async def cases_dashboard():
     if not case_management:
         return {'error': 'Case management engine not available'}
     return case_management.get_cases_dashboard()
-
-@app.get('/api/cases/my-cases')
-async def get_my_cases(user_id: str = None, status: str = None):
-    """Get cases assigned to user"""
-    if not case_management:
-        return {'error': 'Case management engine not available'}
-    
-    #Get user from session if not provided
-    if not user_id:
-        #This would come from session in a real implementation
-        user_id = 'current_user'
     
     return case_management.get_my_cases(user_id, status)
 
@@ -1523,7 +1626,7 @@ async def update_customer(customer_id: int, request: Request):
         conn = get_db_connection()
         cursor = conn.cursor()
         
-        # Build dynamic update query
+        #Build dynamic update query
         update_fields = []
         values = []
         
@@ -1542,7 +1645,7 @@ async def update_customer(customer_id: int, request: Request):
                 update_fields.append(f"{field} = %s")
                 values.append(data[field])
         
-        # Debug: Log which fields are being updated
+        #Debug: Log which fields are being updated
         logger.info(f"Customer update {customer_id} - Fields to update: {update_fields}")
         logger.info(f"Customer update {customer_id} - Number of fields: {len(update_fields)}")
         
@@ -1713,11 +1816,11 @@ async def predict_customer_risk(customer_id: int):
         if pred_label == 'SME' and alerts_engine:
             try:
                 logger.info(f"Generating SME alert for customer {customer_id}")
-                # Prepare customer data for alert evaluation
+                #Prepare customer data for alert evaluation
                 customer_with_prediction = customer.copy()
                 customer_with_prediction['PREDICTED_STATUS'] = pred_label
                 
-                # Evaluate alert conditions
+                #Evaluate alert conditions
                 triggered_alerts = alerts_engine.evaluate_alert_conditions(customer_with_prediction)
                 
                 #Create alerts for triggered conditions
@@ -1762,11 +1865,18 @@ async def get_alerts_dashboard():
 
 @app.post('/api/alerts/{alert_id}/acknowledge')
 async def acknowledge_alert(alert_id: str, request: Request):
-    """Acknowledge an alert"""
+    # """Acknowledge an alert"""
     try:
         data = await request.json()
-        user_id = data.get('user_id', 'current_user')
-        
+        # Prefer authenticated session user
+        session_user = request.session.get('user')
+        user_id = session_user or data.get('user_id', 'current_user')
+
+        # Authorization: allow only specific roles to acknowledge
+        allowed = _require_roles(request, ['admin', 'risk_officer', 'branch_manager', 'recovery_officer'])
+        if not allowed and user_id != 'system':
+            return {'success': False, 'error': 'Forbidden: insufficient privileges'}
+
         if alerts_engine:
             result = alerts_engine.acknowledge_alert(alert_id, user_id)
             return result
@@ -1781,9 +1891,14 @@ async def resolve_alert(alert_id: str, request: Request):
     """Resolve an alert"""
     try:
         data = await request.json()
-        user_id = data.get('user_id', 'current_user')
+        session_user = request.session.get('user')
+        user_id = session_user or data.get('user_id', 'current_user')
         resolution_notes = data.get('resolution_notes', '')
-        
+
+        allowed = _require_roles(request, ['admin', 'risk_officer', 'branch_manager', 'recovery_officer'])
+        if not allowed and user_id != 'system':
+            return {'success': False, 'error': 'Forbidden: insufficient privileges'}
+
         if alerts_engine:
             result = alerts_engine.resolve_alert(alert_id, user_id, resolution_notes)
             return result
@@ -1804,4 +1919,64 @@ async def setup_sme_alert_rules():
             return {'success': False, 'error': 'Alerts engine not initialized'}
     except Exception as e:
         logger.error(f"Failed to setup SME alert rules: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@app.post('/api/alerts/{alert_id}/escalate')
+async def escalate_alert_api(alert_id: str, request: Request):
+    """Escalate an alert manually via API"""
+    try:
+        data = await request.json()
+        session_user = request.session.get('user')
+        user_id = session_user or data.get('user_id', 'current_user')
+
+        allowed = _require_roles(request, ['admin', 'risk_officer', 'branch_manager'])
+        if not allowed and user_id != 'system':
+            return {'success': False, 'error': 'Forbidden: insufficient privileges'}
+
+        if alerts_engine:
+            result = alerts_engine.escalate_alert(alert_id, escalated_by=user_id)
+            return result
+        else:
+            return {'success': False, 'error': 'Alerts engine not initialized'}
+    except Exception as e:
+        logger.error(f"Failed to escalate alert: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@app.get('/api/model-governance/fairness')
+async def model_fairness(sensitive_attribute: str = 'OWNERSHIP'):
+    """Compute fairness metrics for a sensitive attribute"""
+    try:
+        if model_governance:
+            result = model_governance.compute_fairness_metrics(sensitive_attribute)
+            return result
+        else:
+            return {'success': False, 'error': 'Model governance not initialized'}
+    except Exception as e:
+        logger.error(f"Failed to compute fairness metrics: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@app.post('/api/cases/{case_id}/remediate')
+async def remediate_case(case_id: str, request: Request):
+    """Log a remediation action for a case"""
+    try:
+        data = await request.json()
+        # Prefer authenticated session identity
+        session_user = request.session.get('user')
+        user_id = session_user or data.get('user_id', None)
+
+        # Authorization: only recovery_officer, branch_manager, risk_officer, admin
+        allowed = _require_roles(request, ['admin', 'risk_officer', 'branch_manager', 'recovery_officer'])
+        if not allowed and user_id != 'system':
+            return {'success': False, 'error': 'Forbidden: insufficient privileges'}
+
+        if case_management:
+            result = case_management.log_remediation_action(case_id, data, user_id or 'system')
+            return result
+        else:
+            return {'success': False, 'error': 'Case management not initialized'}
+    except Exception as e:
+        logger.error(f"Failed to log remediation action: {e}")
         return {'success': False, 'error': str(e)}

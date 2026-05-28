@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Risk Management Dashboard - CBE Loan Risk Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        .sidebar-item {
+            transition: all 0.3s ease;
+        }
+        .sidebar-item:hover {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+        }
+        .sidebar-item.active {
+            background-color: rgba(59, 130, 246, 0.1);
+            border-left: 4px solid #3b82f6;
+        }
+        .module-card {
+            transition: transform 0.2s ease;
+        }
+        .module-card:hover {
+            transform: translateY(-2px);
+        }
+        .status-badge {
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            50% { opacity: 0.7; }
+        }
+        .chart-container {
+            position: relative;
+            height: 300px;
+            width: 100%;
+        }
+        .chart-container canvas {
+            max-height: 300px !important;
+        }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="flex h-screen">
+        <!-- Sidebar -->
+        <div class="w-64 bg-white shadow-lg">
+            <div class="p-4 border-b">
+                <div class="flex items-center space-x-3">
+                    <img src="/static/image/cbe_l.jpg" alt="CBE Logo" class="w-10 h-10 rounded-lg object-cover">
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-900">CBE Risk</h1>
+                        <p class="text-xs text-gray-500">Loan Management System</p>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="p-4">
+                <div class="space-y-6">
+                    <!-- Main Dashboard -->
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Main</h3>
+                        <a href="/dashboard" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </div>
+                    
+                    <!-- Risk Management -->
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Risk Management</h3>
+                        <div class="space-y-1">
+                            <a href="/customers" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="users" class="w-5 h-5"></i>
+                                <span>Customers</span>
+                            </a>
+                            <a href="/predict" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="brain" class="w-5 h-5"></i>
+                                <span>Predict Risk</span>
+                            </a>
+                            <a href="/alerts" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="bell" class="w-5 h-5"></i>
+                                <span>Alerts</span>
+                                <span id="alertsBadge" class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full status-badge hidden">0</span>
+                            </a>
+                            <a href="/cases" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="folder-open" class="w-5 h-5"></i>
+                                <span>Cases</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Data & Analytics -->
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Data & Analytics</h3>
+                        <div class="space-y-1">
+                            <a href="/etl" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="database" class="w-5 h-5"></i>
+                                <span>ETL Engine</span>
+                            </a>
+                            <a href="/model-governance" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="settings" class="w-5 h-5"></i>
+                                <span>Model Governance</span>
+                            </a>
+                            <a href="/simulation" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="trending-up" class="w-5 h-5"></i>
+                                <span>Simulations</span>
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Reports -->
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Reports</h3>
+                        <div class="space-y-1">
+                            <a href="/reports/portfolio" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="pie-chart" class="w-5 h-5"></i>
+                                <span>Portfolio</span>
+                            </a>
+                            <a href="/reports/compliance" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="file-check" class="w-5 h-5"></i>
+                                <span>Compliance</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+            
+            <!-- User Section -->
+            <div class="absolute bottom-0 left-0 right-0 p-4 border-t">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                        <i data-lucide="user" class="w-4 h-4 text-gray-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-900">{{ user }}</p>
+                        <p class="text-xs text-gray-500">Administrator</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Main Content -->
+        <div class="flex-1 overflow-auto">
+            <!-- Header -->
+            <header class="bg-white shadow-sm border-b">
+                <div class="px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">Risk Management Dashboard</h2>
+                            <p class="text-gray-500">Comprehensive loan risk analysis and management</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="text-sm text-gray-500">
+                                <span id="current-time"></span>
+                            </div>
+                            <button onclick="exportReport()" class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                <i data-lucide="download" class="w-4 h-4 inline mr-2"></i>
+                                Export Report
+                            </button>
+                            <a href="/logout" class="text-red-600 hover:text-red-700 font-medium transition-colors">
+                                <i data-lucide="log-out" class="w-4 h-4 inline mr-2"></i>
+                                Logout
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <!-- Dashboard Content -->
+            <main class="p-6">
+                <!-- KPI Cards -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                    <div class="module-card bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 mb-1">Total Portfolio</p>
+                                <p class="text-2xl font-bold text-gray-900" id="total-portfolio">0</p>
+                            </div>
+                            <div class="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center">
+                                <i data-lucide="users" class="w-6 h-6 text-blue-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="module-card bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 mb-1">Active Loans</p>
+                                <p class="text-2xl font-bold text-gray-900" id="active-loans">0</p>
+                            </div>
+                            <div class="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center">
+                                <i data-lucide="trending-up" class="w-6 h-6 text-green-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="module-card bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 mb-1">Risk Alerts</p>
+                                <p class="text-2xl font-bold text-gray-900" id="risk-alerts">0</p>
+                            </div>
+                            <div class="w-12 h-12 bg-red-100 rounded-lg flex items-center justify-center">
+                                <i data-lucide="alert-triangle" class="w-6 h-6 text-red-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="module-card bg-white rounded-lg shadow p-6">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <p class="text-sm text-gray-500 mb-1">Risk Distribution</p>
+                                <p class="text-2xl font-bold text-gray-900" id="risk-regions">0</p>
+                            </div>
+                            <div class="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
+                                <i data-lucide="pie-chart" class="w-6 h-6 text-purple-600"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Charts Section -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Portfolio Overview</h3>
+                        <div class="chart-container">
+                            <canvas id="portfolioChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="bg-white rounded-lg shadow p-6">
+                        <h3 class="text-lg font-semibold text-gray-900 mb-4">Risk Distribution</h3>
+                        <div class="chart-container">
+                            <canvas id="riskChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Recent Activity -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <h3 class="text-lg font-semibold text-gray-900">Recent Risk Assessments</h3>
+                    </div>
+                    <div class="p-6">
+                        <div class="space-y-4">
+                            <div class="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                                <div class="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center">
+                                    <i data-lucide="alert-triangle" class="w-5 h-5 text-red-600"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-gray-900">High Risk Loan Detected</p>
+                                    <p class="text-sm text-gray-500">Contract Code: CBE-2024-001</p>
+                                </div>
+                                <span class="text-sm text-gray-400">2 hours ago</span>
+                            </div>
+                            
+                            <div class="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                                <div class="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center">
+                                    <i data-lucide="alert-circle" class="w-5 h-5 text-yellow-600"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-gray-900">Medium Risk Warning</p>
+                                    <p class="text-sm text-gray-500">Contract Code: CBE-2024-002</p>
+                                </div>
+                                <span class="text-sm text-gray-400">5 hours ago</span>
+                            </div>
+                            
+                            <div class="flex items-center space-x-4 p-4 bg-gray-50 rounded-lg">
+                                <div class="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center">
+                                    <i data-lucide="check-circle" class="w-5 h-5 text-green-600"></i>
+                                </div>
+                                <div class="flex-1">
+                                    <p class="font-medium text-gray-900">Low Risk Confirmed</p>
+                                    <p class="text-sm text-gray-500">Contract Code: CBE-2024-003</p>
+                                </div>
+                                <span class="text-sm text-gray-400">1 day ago</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <script>
+        // Initialize Lucide icons
+        lucide.createIcons();
+        
+        // Update current time
+        function updateTime() {
+            const now = new Date();
+            document.getElementById('current-time').textContent = now.toLocaleString();
+        }
+        setInterval(updateTime, 1000);
+        updateTime();
+        
+        // Set active sidebar item
+        const currentPath = window.location.pathname;
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            if (item.getAttribute('href') === currentPath) {
+                item.classList.add('active');
+            }
+        });
+        
+        // Load real dashboard data from API
+        async function loadDashboardData() {
+            try {
+                const response = await fetch('/api/kpis');
+                const data = await response.json();
+                
+                // Update dashboard with real data
+                document.getElementById('total-portfolio').textContent = data.total_portfolio.toLocaleString();
+                document.getElementById('active-loans').textContent = data.active_loans.toLocaleString();
+                document.getElementById('risk-alerts').textContent = data.risk_alerts.toLocaleString();
+                
+                // Update risk regions count
+                const riskResponse = await fetch('/api/risk-distribution');
+                const riskData = await riskResponse.json();
+                document.getElementById('risk-regions').textContent = riskData.regions.length;
+                
+                // Remove change indicators - no longer needed
+                
+                console.log('Dashboard data loaded:', data);
+                console.log('Risk distribution data loaded:', riskData);
+            } catch (error) {
+                console.error('Error loading dashboard data:', error);
+                // Fallback to mock data
+                document.getElementById('total-portfolio').textContent = '0';
+                document.getElementById('active-loans').textContent = '0';
+                document.getElementById('risk-alerts').textContent = '0';
+                document.getElementById('risk-regions').textContent = '0';
+            }
+        }
+        
+        // Initialize charts
+        function initCharts() {
+            // Initialize Portfolio Overview chart
+            initPortfolioOverviewChart();
+            // Initialize Risk Distribution chart
+            initRiskDistributionChart();
+            console.log('Charts initialized');
+        }
+        
+        // Initialize Portfolio Overview chart
+        async function initPortfolioOverviewChart() {
+            try {
+                const response = await fetch('/api/portfolio-overview');
+                const data = await response.json();
+                
+                if (data.portfolio_data && data.portfolio_data.length > 0) {
+                    const ctx = document.getElementById('portfolioChart').getContext('2d');
+                    
+                    // Prepare data for pie chart
+                    const labels = data.portfolio_data.map(item => item.status);
+                    const counts = data.portfolio_data.map(item => item.count);
+                    const colors = data.portfolio_data.map(item => item.color);
+                    const percentages = data.portfolio_data.map(item => item.percentage);
+                    
+                    // Create pie chart
+                    new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Portfolio Distribution',
+                                data: counts,
+                                backgroundColor: colors,
+                                borderColor: colors.map(color => color.replace('0.8', '1')),
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            aspectRatio: 1.5,
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: 'Portfolio Distribution by Status',
+                                    font: {
+                                        size: 16,
+                                        weight: 'bold'
+                                    },
+                                    padding: {
+                                        bottom: 20
+                                    }
+                                },
+                                legend: {
+                                    position: 'right',
+                                    labels: {
+                                        padding: 15,
+                                        font: {
+                                            size: 12
+                                        },
+                                        usePointStyle: true,
+                                        pointStyle: 'circle',
+                                        generateLabels: function(chart) {
+                                            const data = chart.data;
+                                            return data.labels.map((label, i) => {
+                                                const item = data.datasets[0].data[i];
+                                                const percentage = percentages[i];
+                                                return {
+                                                    text: `${label}: ${item} (${percentage}%)`,
+                                                    fillStyle: colors[i],
+                                                    strokeStyle: colors[i].replace('0.8', '1'),
+                                                    lineWidth: 2,
+                                                    pointStyle: 'circle',
+                                                    hidden: false,
+                                                    index: i
+                                                };
+                                            });
+                                        }
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.label || '';
+                                            const value = context.parsed;
+                                            const percentage = percentages[context.dataIndex];
+                                            return `${label}: ${value} customers (${percentage}%)`;
+                                        },
+                                        afterLabel: function(context) {
+                                            // Add total amount for this status
+                                            const statusData = data.portfolio_data.find(item => item.status === context.label);
+                                            if (statusData && statusData.total_amount > 0) {
+                                                const amount = new Intl.NumberFormat('en-US', {
+                                                    style: 'currency',
+                                                    currency: 'ETB',
+                                                    minimumFractionDigits: 0,
+                                                    maximumFractionDigits: 0
+                                                }).format(statusData.total_amount);
+                                                return `Total Amount: ${amount}`;
+                                            }
+                                            return [];
+                                        }
+                                    }
+                                }
+                            },
+                            layout: {
+                                padding: {
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error initializing portfolio overview chart:', error);
+            }
+        }
+        
+        // Initialize Risk Distribution pie chart
+        async function initRiskDistributionChart() {
+            try {
+                const response = await fetch('/api/risk-distribution');
+                const data = await response.json();
+                
+                if (data.regions && data.regions.length > 0) {
+                    const ctx = document.getElementById('riskChart').getContext('2d');
+                    
+                    // Prepare data for pie chart - combine NPL and SME by region
+                    const labels = data.regions.map(r => r.region);
+                    const totalData = data.regions.map(r => r.total);
+                    const backgroundColors = [
+                        'rgba(239, 68, 68, 0.8)',   // Red for high risk regions
+                        'rgba(251, 146, 60, 0.8)',  // Orange for medium risk
+                        'rgba(59, 130, 246, 0.8)',  // Blue for low risk
+                        'rgba(34, 197, 94, 0.8)',   // Green for minimal risk
+                        'rgba(168, 85, 247, 0.8)',  // Purple
+                        'rgba(236, 72, 153, 0.8)'   // Pink
+                    ];
+                    
+                    // Create pie chart
+                    new Chart(ctx, {
+                        type: 'pie',
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: 'Risk Customers',
+                                data: totalData,
+                                backgroundColor: backgroundColors.slice(0, labels.length),
+                                borderColor: backgroundColors.slice(0, labels.length).map(color => color.replace('0.8', '1')),
+                                borderWidth: 2
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: true,
+                            aspectRatio: 1.5,
+                            plugins: {
+                                title: {
+                                    display: true,
+                                    text: 'Risk Distribution by CBE Region',
+                                    font: {
+                                        size: 16,
+                                        weight: 'bold'
+                                    },
+                                    padding: {
+                                        bottom: 20
+                                    }
+                                },
+                                legend: {
+                                    position: 'right',
+                                    labels: {
+                                        padding: 15,
+                                        font: {
+                                            size: 12
+                                        },
+                                        usePointStyle: true,
+                                        pointStyle: 'circle'
+                                    }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.label || '';
+                                            const value = context.parsed;
+                                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                            const percentage = ((value / total) * 100).toFixed(1);
+                                            return `${label}: ${value} customers (${percentage}%)`;
+                                        },
+                                        afterLabel: function(context) {
+                                            // Add breakdown of NPL and SME for this region
+                                            const regionData = data.regions.find(r => r.region === context.label);
+                                            if (regionData) {
+                                                return [
+                                                    `NPL: ${regionData.npl}`,
+                                                    `SME: ${regionData.sme}`
+                                                ];
+                                            }
+                                            return [];
+                                        }
+                                    }
+                                }
+                            },
+                            layout: {
+                                padding: {
+                                    top: 10,
+                                    bottom: 10,
+                                    left: 10,
+                                    right: 10
+                                }
+                            }
+                        }
+                    });
+                }
+            } catch (error) {
+                console.error('Error initializing risk distribution chart:', error);
+            }
+        }
+        
+        // Export report function
+        function exportReport() {
+            alert('Export functionality would be implemented here');
+        }
+        
+        // Load data on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDashboardData();
+            initCharts();
+            fetchAlertsCount();
+        });
+
+        // Fetch alerts count and update badge (keeps sidebar badge in sync)
+        async function fetchAlertsCount() {
+            try {
+                const res = await fetch('/api/alerts/dashboard');
+                if (!res.ok) return;
+                const data = await res.json();
+                const summary = data.alert_summary || {};
+                const count = parseInt(summary.open_alerts || summary.total_alerts || 0) || 0;
+                const badge = document.getElementById('alertsBadge');
+                if (!badge) return;
+                if (count > 0) {
+                    badge.textContent = count;
+                    badge.classList.remove('hidden');
+                } else {
+                    badge.classList.add('hidden');
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+    </script>
+</body>
+</html>

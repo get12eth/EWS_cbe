@@ -1,0 +1,1238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Management - CBE Loan Risk Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        .sidebar-item { transition: all 0.3s ease; }
+        .sidebar-item:hover { background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; }
+        .sidebar-item.active { background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; }
+        .action-btn { transition: all 0.2s ease; }
+        .action-btn:hover { transform: scale(1.05); }
+    </style>
+</head>
+<body class="bg-gray-50">
+    <div class="flex h-screen">
+        <div class="w-64 bg-white shadow-lg">
+            <div class="p-4 border-b">
+                <div class="flex items-center space-x-3">
+                    <img src="/static/image/cbe_l.jpg" alt="CBE Logo" class="w-10 h-10 rounded-lg object-cover">
+                    <div>
+                        <h1 class="text-lg font-bold text-gray-900">CBE EWS</h1>
+                        <p class="text-xs text-gray-500">Loan Management System</p>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="p-4">
+                <div class="space-y-6">
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Main</h3>
+                        <a href="/dashboard" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
+                            <span>Dashboard</span>
+                        </a>
+                    </div>
+                    
+                    <div>
+                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Risk Management</h3>
+                        <div class="space-y-1">
+                            <a href="/customers" class="sidebar-item flex items-center space-x-3 text-blue-600 p-2 rounded-lg bg-blue-50">
+                                <i data-lucide="users" class="w-5 h-5"></i>
+                                <span>Customers</span>
+                            </a>
+                            <a href="/predict" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="trending-up" class="w-5 h-5"></i>
+                                <span>Predict Risk</span>
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </nav>
+            
+            <div class="absolute bottom-0 left-0 right-0 p-4 border-t">
+                <div class="flex items-center space-x-3">
+                    <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
+                        <i data-lucide="user" class="w-4 h-4 text-gray-600"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-sm font-medium text-gray-900">{{ user }}</p>
+                        <p class="text-xs text-gray-500">Administrator</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="flex-1 overflow-auto">
+            <header class="bg-white shadow-sm border-b">
+                <div class="px-6 py-4">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h2 class="text-2xl font-bold text-gray-900">Customer Management</h2>
+                            <p class="text-gray-500">Manage customers and predict loan risks</p>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <input type="text" id="searchInput" placeholder="Search customers..." 
+                                   class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                                        <button onclick="openAddCustomerModal()" 
+                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                <i data-lucide="plus" class="w-5 h-5 inline mr-2"></i>
+                                Add Customer
+                            </button>
+                            <a href="/logout" class="text-red-600 hover:text-red-700 font-medium transition-colors">
+                                <i data-lucide="log-out" class="w-4 h-4 inline mr-2"></i>
+                                Logout
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </header>
+            
+            <main class="p-6">
+                <!-- Customer List -->
+                <div class="bg-white rounded-lg shadow">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <h3 class="text-lg font-semibold text-gray-900">Customer List</h3>
+                            <span class="text-sm text-gray-500" id="customerCount">0 customers</span>
+                        </div>
+                    </div>
+                    
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full divide-y divide-gray-200">
+                            <thead class="bg-gray-50">
+                                <tr>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Code</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Customer Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Principal</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sector</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Prediction Class</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">each class Probabilities</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="customerTableBody" class="bg-white divide-y divide-gray-200">
+                                <!-- Customer rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                    
+                    <!-- Loading indicator -->
+                    <div id="loadingIndicator" class="hidden p-8 text-center">
+                        <div class="inline-flex items-center">
+                            <svg class="animate-spin h-5 w-5 mr-3" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" fill="none"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                            Loading customers...
+                        </div>
+                    </div>
+                </div>
+            </main>
+        </div>
+    </div>
+    
+    <!-- Edit Customer Modal -->
+    <div id="editCustomerModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Edit Customer</h3>
+                    <button onclick="closeEditCustomerModal()" class="text-gray-400 hover:text-gray-600">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                
+                <form id="editCustomerForm" onsubmit="event.preventDefault(); updateCustomer();">
+                    <input type="hidden" id="editCustomerHiddenId" name="id">
+                    <div class="space-y-6">
+                        <!-- Basic Information Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Contract Code *</label>
+                                <input type="text" id="editContractCode" name="CONTRACT_CODE" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Approved Amount *</label>
+                                <input type="number" id="editApprovedAmount" name="APPROVED_AMOUNT" step="0.01" required
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Location Information Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">District *</label>
+                                <select id="editDistrict" name="DISTRICTNAME" required
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select District</option>
+                                    <option value="KIRKOS">Kirkos</option>
+                                    <option value="ARADA">Arada</option>
+                                    <option value="HAWASSA">Hawassa</option>
+                                    <option value="MERKATO">Merkato</option>
+                                    <option value="DEBRE BREHAN">Debre Brehan</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">CBE Region *</label>
+                                <select id="editCbeRegion" name="CBE_REGION" required
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select CBE Region</option>
+                                    <option value="CENTRAL">Central</option>
+                                    <option value="SOUTH WEST">South West</option>
+                                    <option value="NORTH EAST">North East</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+                                <select id="editBranch" name="BRANCHNAME" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Branch</option>
+                                    <option value="Minasie Lema Branch">Minasie Lema Branch</option>
+                                    <option value="Arada Giorgis Branch">Arada Giorgis Branch</option>
+                                    <option value="Addis Ababa Branch">Addis Ababa Branch</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Collateral Value</label>
+                                <input type="number" id="editCollateralValue" name="COLLATERAL_VALUE" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Date Information Row -->
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Grant Date</label>
+                                <input type="date" id="editGrantDate" name="GRANT_DATE" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                                <input type="date" id="editExpiryDate" name="EXPIRY_DATE" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Business Date</label>
+                                <input type="date" id="editBusinessDate" name="BUSINESS_DATE" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Loan Details Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Loan Type *</label>
+                                <select id="editLoanType" name="LOAN_TYPE" required
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Loan Type</option>
+                                    <option value="TL">TL - Term Loan</option>
+                                    <option value="ML">ML - Medium Term Loan</option>
+                                    <option value="AL">AL - Agricultural Loan</option>
+                                    <option value="OD">OD - Overdraft</option>
+                                    <option value="CB">CB - Commercial Banking</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Loan Description</label>
+                                <select id="editLoanDescription" name="LOAN_DESCRIPTION" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Description</option>
+                                    <option value="Home Loan">Home Loan</option>
+                                    <option value="Motor Vehicle Loan">Motor Vehicle Loan</option>
+                                    <option value="Consumer Durables Loan">Consumer Durables Loan</option>
+                                    <option value="Education Loan">Education Loan</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Loan Product</label>
+                                <select id="editLoanProduct" name="LOAN_PRODUCT" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Product</option>
+                                    <option value="HOME.RES">HOME.RES - Residential</option>
+                                    <option value="CAR.LOAN">CAR.LOAN - Vehicle</option>
+                                    <option value="CONS.DURABLE">CONS.DURABLE - Consumer</option>
+                                    <option value="EDU.LOAN">EDU.LOAN - Education</option>
+                                    <option value="TERM.LOAN">TERM.LOAN - Term</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">L Type</label>
+                                <select id="editLType" name="LTYPE" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select L Type</option>
+                                    <option value="AA">AA - Addis Ababa</option>
+                                    <option value="OD">OD - Overdraft</option>
+                                    <option value="LD">LD - Long Term</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Financial Information Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Principal OS</label>
+                                <input type="number" id="editPrincipal" name="PRINCIPAL_OS" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Interest OS</label>
+                                <input type="number" id="editInterestOS" name="INTEREST_OS" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Principal Arrears</label>
+                                <input type="number" id="editPrincipalArrears" name="PRINCIPAL_ARREARS" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Current Commitment</label>
+                                <input type="number" id="editCurrentCommitment" name="CURRENT_COMMITTMENT" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Installment Amount</label>
+                                <input type="number" id="editInstallmentAmount" name="INSTALLMENT_AMOUNT" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tenure</label>
+                                <select id="editTenure" name="TENURE" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Tenure</option>
+                                    <option value="Long Term">Long Term</option>
+                                    <option value="Short Term">Short Term</option>
+                                    <option value="Medium Term">Medium Term</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Term</label>
+                                <select id="editTerm" name="TERM" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Term</option>
+                                    <option value="SHORT TERM">Short Term</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="LONG TERM">Long Term</option>
+                                    <option value="MEDIUM TERM">Medium Term</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Term of Payment</label>
+                                <select id="editTermOfPayment" name="TERM_OF_PAYMENT" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Payment Term</option>
+                                    <option value="Monthly">Monthly</option>
+                                    <option value="Bullet (One lump sum upon Maturity)">Bullet (One lump sum upon Maturity)</option>
+                                    <option value="Annually">Annually</option>
+                                    <option value="Half Yearly">Half Yearly</option>
+                                    <option value="Quarterly">Quarterly</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Classification Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Economic Sector *</label>
+                                <select id="editEconomicSector" name="ECONOMIC_SECTOR" required
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Economic Sector</option>
+                                    <option value="Consumer and staff loans">Consumer and staff loans</option>
+                                    <option value="other sector">Other sector</option>
+                                    <option value="Domestic Trade">Domestic Trade</option>
+                                    <option value="Transport and Communication">Transport and Communication</option>
+                                    <option value="Buliding and Construction">Building and Construction</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                                <select id="editIndustry" name="INDUSTRY" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Industry</option>
+                                    <option value="Other individuals">Other individuals</option>
+                                    <option value="Passenger road transport">Passenger road transport</option>
+                                    <option value="Retail agriculture products">Retail agriculture products</option>
+                                    <option value="Staff of CBE">Staff of CBE</option>
+                                    <option value="Real Estate Development">Real Estate Development</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Ownership</label>
+                                <select id="editOwnership" name="OWNERSHIP" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Ownership</option>
+                                    <option value="PRIVATE">Private</option>
+                                    <option value="COOPRATIVE">Cooperative</option>
+                                    <option value="PUBLIC">Public</option>
+                                    <option value="GOVERNMENT">Government</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Sector</label>
+                                <select id="editSector" name="SECTOR" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Sector</option>
+                                    <option value="Individual">Individual</option>
+                                    <option value="DOMESTIC TRADE">Domestic Trade</option>
+                                    <option value="Transportation & storage">Transportation & storage</option>
+                                    <option value="Construction">Construction</option>
+                                    <option value="Agricultur hunt forestry & fishing">Agriculture, hunting, forestry & fishing</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Product Owner</label>
+                                <select id="editProductOwner" name="PRODUCT_OWNER" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Product Owner</option>
+                                    <option value="KIRKOS">Kirkos</option>
+                                    <option value="ARADA">Arada</option>
+                                    <option value="HAWASSA">Hawassa</option>
+                                    <option value="MERKATO">Merkato</option>
+                                    <option value="DEBRE BREHAN">Debre Brehan</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <!-- Empty cell for layout balance -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button type="button" onclick="closeEditCustomerModal()" 
+                                class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                            Update Customer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Add Customer Modal -->
+    <div id="addCustomerModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
+            <div class="mt-3">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-lg font-medium text-gray-900">Add New Customer</h3>
+                    <button onclick="closeAddCustomerModal()" class="text-gray-400 hover:text-gray-600">
+                        <i data-lucide="x" class="w-6 h-6"></i>
+                    </button>
+                </div>
+                
+                <form id="addCustomerForm" onsubmit="event.preventDefault(); addCustomer();">
+                    <div class="space-y-6">
+                        <!-- Basic Information Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Contract Code *</label>
+                                <input type="text" name="CONTRACT_CODE" required 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Approved Amount *</label>
+                                <input type="number" name="APPROVED_AMOUNT" step="0.01" required
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Location Information Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">District *</label>
+                                <select name="DISTRICTNAME" required
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select District</option>
+                                    <option value="KIRKOS">Kirkos</option>
+                                    <option value="ARADA">Arada</option>
+                                    <option value="HAWASSA">Hawassa</option>
+                                    <option value="MERKATO">Merkato</option>
+                                    <option value="DEBRE BREHAN">Debre Brehan</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">CBE Region *</label>
+                                <select name="CBE_REGION" required
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select CBE Region</option>
+                                    <option value="CENTRAL">Central</option>
+                                    <option value="SOUTH WEST">South West</option>
+                                    <option value="NORTH EAST">North East</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+                                <select name="BRANCHNAME" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Branch</option>
+                                    <option value="Minasie Lema Branch">Minasie Lema Branch</option>
+                                    <option value="Arada Giorgis Branch">Arada Giorgis Branch</option>
+                                    <option value="Addis Ababa Branch">Addis Ababa Branch</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Collateral Value</label>
+                                <input type="number" name="COLLATERAL_VALUE" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Date Information Row -->
+                        <div class="grid grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Grant Date</label>
+                                <input type="date" name="GRANT_DATE" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Expiry Date</label>
+                                <input type="date" name="EXPIRY_DATE" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Business Date</label>
+                                <input type="date" name="BUSINESS_DATE" 
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <!-- Loan Details Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Loan Type *</label>
+                                <select name="LOAN_TYPE" required
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Loan Type</option>
+                                    <option value="TL">TL - Term Loan</option>
+                                    <option value="ML">ML - Medium Term Loan</option>
+                                    <option value="AL">AL - Agricultural Loan</option>
+                                    <option value="OD">OD - Overdraft</option>
+                                    <option value="CB">CB - Commercial Banking</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Loan Description</label>
+                                <select name="LOAN_DESCRIPTION" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Description</option>
+                                    <option value="Home Loan">Home Loan</option>
+                                    <option value="Motor Vehicle Loan">Motor Vehicle Loan</option>
+                                    <option value="Consumer Durables Loan">Consumer Durables Loan</option>
+                                    <option value="Education Loan">Education Loan</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Loan Product</label>
+                                <select name="LOAN_PRODUCT" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Product</option>
+                                    <option value="HOME.RES">HOME.RES - Residential</option>
+                                    <option value="CAR.LOAN">CAR.LOAN - Vehicle</option>
+                                    <option value="CONS.DURABLE">CONS.DURABLE - Consumer</option>
+                                    <option value="EDU.LOAN">EDU.LOAN - Education</option>
+                                    <option value="TERM.LOAN">TERM.LOAN - Term</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">L Type</label>
+                                <select name="LTYPE" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select L Type</option>
+                                    <option value="AA">AA - Addis Ababa</option>
+                                    <option value="OD">OD - Overdraft</option>
+                                    <option value="LD">LD - Long Term</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Financial Information Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Principal OS</label>
+                                <input type="number" name="PRINCIPAL_OS" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Interest OS</label>
+                                <input type="number" name="INTEREST_OS" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Principal Arrears</label>
+                                <input type="number" name="PRINCIPAL_ARREARS" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Current Commitment</label>
+                                <input type="number" name="CURRENT_COMMITTMENT" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Installment Amount</label>
+                                <input type="number" name="INSTALLMENT_AMOUNT" step="0.01"
+                                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Tenure</label>
+                                <select name="TENURE" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Tenure</option>
+                                    <option value="Long Term">Long Term</option>
+                                    <option value="Short Term">Short Term</option>
+                                    <option value="Medium Term">Medium Term</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Term</label>
+                                <select name="TERM" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Term</option>
+                                    <option value="SHORT TERM">Short Term</option>
+                                    <option value="MEDIUM">Medium</option>
+                                    <option value="LONG TERM">Long Term</option>
+                                    <option value="MEDIUM TERM">Medium Term</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Term of Payment</label>
+                                <select name="TERM_OF_PAYMENT" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Payment Term</option>
+                                    <option value="Monthly">Monthly</option>
+                                    <option value="Bullet (One lump sum upon Maturity)">Bullet (One lump sum upon Maturity)</option>
+                                    <option value="Annually">Annually</option>
+                                    <option value="Half Yearly">Half Yearly</option>
+                                    <option value="Quarterly">Quarterly</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <!-- Classification Row -->
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Economic Sector *</label>
+                                <select name="ECONOMIC_SECTOR" required
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Economic Sector</option>
+                                    <option value="Consumer and staff loans">Consumer and staff loans</option>
+                                    <option value="other sector">Other sector</option>
+                                    <option value="Domestic Trade">Domestic Trade</option>
+                                    <option value="Transport and Communication">Transport and Communication</option>
+                                    <option value="Buliding and Construction">Building and Construction</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Industry</label>
+                                <select name="INDUSTRY" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Industry</option>
+                                    <option value="Other individuals">Other individuals</option>
+                                    <option value="Passenger road transport">Passenger road transport</option>
+                                    <option value="Retail agriculture products">Retail agriculture products</option>
+                                    <option value="Staff of CBE">Staff of CBE</option>
+                                    <option value="Real Estate Development">Real Estate Development</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Ownership</label>
+                                <select name="OWNERSHIP" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Ownership</option>
+                                    <option value="PRIVATE">Private</option>
+                                    <option value="COOPRATIVE">Cooperative</option>
+                                    <option value="PUBLIC">Public</option>
+                                    <option value="GOVERNMENT">Government</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Sector</label>
+                                <select name="SECTOR" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Sector</option>
+                                    <option value="Individual">Individual</option>
+                                    <option value="DOMESTIC TRADE">Domestic Trade</option>
+                                    <option value="Transportation & storage">Transportation & storage</option>
+                                    <option value="Construction">Construction</option>
+                                    <option value="Agricultur hunt forestry & fishing">Agriculture, hunting, forestry & fishing</option>
+                                </select>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Product Owner</label>
+                                <select name="PRODUCT_OWNER" 
+                                        class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="">Select Product Owner</option>
+                                    <option value="KIRKOS">Kirkos</option>
+                                    <option value="ARADA">Arada</option>
+                                    <option value="HAWASSA">Hawassa</option>
+                                    <option value="MERKATO">Merkato</option>
+                                    <option value="DEBRE BREHAN">Debre Brehan</option>
+                                </select>
+                            </div>
+                            
+                            <div>
+                                <!-- Empty cell for layout balance -->
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="flex justify-end space-x-3 mt-6">
+                        <button type="button" onclick="closeAddCustomerModal()" 
+                                class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                            Cancel
+                        </button>
+                        <button type="submit" 
+                                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                            Add Customer
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        let customers = [];
+        
+        // Load customers on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('DOMContentLoaded event fired');
+            lucide.createIcons();
+            loadCustomers();
+            
+            // Listen for refresh signals from Predict Risk page
+            window.addEventListener('storage', function(e) {
+                if (e.key === 'refreshCustomerTable') {
+                    loadCustomers();
+                    // Clear the signal
+                    localStorage.removeItem('refreshCustomerTable');
+                }
+            });
+            
+            // Test basic JavaScript functionality
+            window.testBasicJS = function() {
+                console.log('Basic JavaScript test - this works!');
+                alert('JavaScript is working!');
+            };
+            
+            // Test if customers array is accessible
+            window.testCustomersArray = function() {
+                console.log('Customers array test');
+                console.log('customers variable:', typeof customers);
+                console.log('customers value:', customers);
+                console.log('customers length:', customers ? customers.length : 'undefined');
+            };
+        });
+        
+        // Customer Management Functions
+        function openAddCustomerModal() {
+            document.getElementById('addCustomerModal').classList.remove('hidden');
+        }
+        
+        function closeAddCustomerModal() {
+            document.getElementById('addCustomerModal').classList.add('hidden');
+            document.getElementById('addCustomerForm').reset();
+        }
+        
+        async function addCustomer() {
+            const formData = new FormData(document.getElementById('addCustomerForm'));
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch('/api/customers', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Customer added successfully!');
+                    closeAddCustomerModal();
+                    loadCustomers(); // Refresh list
+                } else {
+                    alert('Error adding customer: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error adding customer:', error);
+                alert('Failed to add customer');
+            }
+        }
+        
+        async function loadCustomers() {
+            try {
+                document.getElementById('loadingIndicator').classList.remove('hidden');
+                
+                const response = await fetch('/api/customers');
+                const result = await response.json();
+                
+                if (result.success) {
+                    customers = result.customers;
+                    displayCustomers(customers);
+                    document.getElementById('customerCount').textContent = `${customers.length} customers`;
+                } else {
+                    console.error('Failed to load customers:', result.error);
+                    alert('Failed to load customers');
+                }
+            } catch (error) {
+                console.error('Error loading customers:', error);
+                alert('Failed to load customers');
+            } finally {
+                document.getElementById('loadingIndicator').classList.add('hidden');
+            }
+        }
+        
+        function displayCustomers(customerList) {
+            const tbody = document.getElementById('customerTableBody');
+            tbody.innerHTML = '';
+            
+            customerList.forEach(customer => {
+                const row = document.createElement('tr');
+                row.className = 'hover:bg-gray-50';
+                
+                // Update risk badge to show actual prediction class (use API keys)
+                const predictionClass = customer.predicted_status || customer.PREDICTION || 'Not Predicted';
+                let riskBadgeClass = 'bg-gray-100 text-gray-800';
+                let riskBadgeExtra = '';
+
+                // Map statuses to requested visual styles:
+                // - PAS: bold green
+                // - SET: light green
+                // - SME: yellow
+                // - NPL: red
+                if (predictionClass === 'NPL') {
+                    riskBadgeClass = 'bg-red-600 text-white';
+                    riskBadgeExtra = 'font-bold';
+                } else if (predictionClass === 'PAS') {
+                    riskBadgeClass = 'bg-green-600 text-white';
+                    riskBadgeExtra = 'font-bold';
+                } else if (predictionClass === 'SET') {
+                    riskBadgeClass = 'bg-green-100 text-green-800';
+                } else if (predictionClass === 'SME') {
+                    riskBadgeClass = 'bg-yellow-100 text-yellow-800';
+                }
+                
+                // Create all probabilities display
+                // Accept multiple naming conventions from API/backends: lower_case or upper_case
+                const allProbs = [];
+                const nplProb = customer.npl_probability ?? customer.NPL_PROBABILITY ?? customer.npl_prob ?? 0.0;
+                const pasProb = customer.pas_probability ?? customer.PAS_PROBABILITY ?? customer.pas_prob ?? 0.0;
+                const smeProb = customer.sme_probability ?? customer.SME_PROBABILITY ?? customer.sme_prob ?? 0.0;
+                const setProb = customer.set_probability ?? customer.SET_PROBABILITY ?? customer.set_prob ?? 0.0;
+
+                if (nplProb !== null && nplProb !== undefined) allProbs.push(`NPL: ${(Number(nplProb) * 100).toFixed(2)}%`);
+                if (pasProb !== null && pasProb !== undefined) allProbs.push(`PAS: ${(Number(pasProb) * 100).toFixed(2)}%`);
+                if (smeProb !== null && smeProb !== undefined) allProbs.push(`SME: ${(Number(smeProb) * 100).toFixed(2)}%`);
+                if (setProb !== null && setProb !== undefined) allProbs.push(`SET: ${(Number(setProb) * 100).toFixed(2)}%`);
+                
+                const allProbsDisplay = allProbs.length > 0 ? allProbs.join(' | ') : 'N/A';
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${customer.CONTRACT_CODE}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${customer.CUST_SHORTNAME || customer.CUSTOMER_NAME || 'N/A'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">$${customer.PRINCIPAL_OS?.toLocaleString() || '0'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">${customer.ECONOMIC_SECTOR || 'N/A'}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm">
+                        <span class="px-2 inline-flex text-xs leading-5 rounded-full ${riskBadgeClass} ${riskBadgeExtra}">
+                            ${predictionClass}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-xs">${allProbsDisplay}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div class="flex space-x-2">
+                            <button onclick="console.log('Direct edit click for customer:', ${customer.id}); editCustomer(${customer.id});" 
+                                    class="action-btn text-blue-600 hover:text-blue-900" 
+                                    title="Edit"
+                                    style="pointer-events: auto; z-index: 10; position: relative; cursor: pointer;">
+                                <i data-lucide="edit-2" class="w-4 h-4 pointer-events-none"></i>
+                            </button>
+                                                                                    <button onclick="deleteCustomer(${customer.id})" 
+                                    class="action-btn text-red-600 hover:text-red-900" title="Delete">
+                                <i data-lucide="trash-2" class="w-4 h-4"></i>
+                            </button>
+                        </div>
+                    </td>
+                `;
+                
+                tbody.appendChild(row);
+            });
+            
+            // Re-initialize Lucide icons for new elements
+            lucide.createIcons();
+            
+                    }
+        
+        function editCustomer(customerId) {
+            console.log('editCustomer called with customerId:', customerId);
+            console.log('Available customers:', customers);
+            
+            const customer = customers.find(c => c.id === customerId);
+            if (!customer) {
+                console.error('Customer not found with ID:', customerId);
+                return;
+            }
+            
+            console.log('Found customer:', customer);
+            console.log('Customer object keys:', Object.keys(customer));
+            console.log('Customer data:', JSON.stringify(customer, null, 2));
+            
+            // Set the hidden customer ID
+            const hiddenId = document.getElementById('editCustomerHiddenId');
+            console.log('Hidden ID element:', hiddenId);
+            if (hiddenId) {
+                hiddenId.value = customer.id;
+                console.log('Set hidden ID to:', customer.id);
+            } else {
+                console.error('editCustomerHiddenId element not found');
+                return;
+            }
+            
+            // Set form field values - only map fields that exist in database schema
+            const fields = [
+                // Basic Information
+                { id: 'editContractCode', field: 'CONTRACT_CODE' },
+                { id: 'editCustomerID', field: 'CUSTOMER_ID' },
+                { id: 'editCustomerName', field: 'CUST_SHORTNAME' },
+                
+                // Code Information
+                { id: 'editCOCode', field: 'CO_CODE' },
+                { id: 'editArrangementId', field: 'ARRNGEMENT_ID' },
+                { id: 'editLineNo', field: 'LINE_NO' },
+                { id: 'editProdCode', field: 'PROD_CODE' },
+                
+                // Location Information
+                { id: 'editDistrict', field: 'DISTRICTNAME' },
+                { id: 'editRegion', field: 'REGIONNAME' },
+                { id: 'editCbeRegion', field: 'CBE_REGION' },
+                { id: 'editBranch', field: 'BRANCHNAME' },
+                
+                // Officer Information
+                { id: 'editRelationshipManager', field: 'RELATIONSHIP_MANAGER' },
+                { id: 'editAcctOfficerCode', field: 'ACCT_OFFICER_CODE' },
+                { id: 'editDaoName', field: 'DAO_NAME' },
+                { id: 'editDaoCode', field: 'DAO_CODE' },
+                
+                // Financial Information
+                { id: 'editApprovedAmount', field: 'APPROVED_AMOUNT' },
+                { id: 'editPrincipal', field: 'PRINCIPAL_OS' },
+                { id: 'editInterestOS', field: 'INTEREST_OS' },
+                { id: 'editPrincipalArrears', field: 'PRINCIPAL_ARREARS' },
+                { id: 'editInterestArrears', field: 'INTEREST_ARREARS' },
+                { id: 'editCurrentCommitment', field: 'CURRENT_COMMITTMENT' },
+                { id: 'editInterestRate', field: 'INTEREST_RATE' },
+                { id: 'editInstallmentAmount', field: 'INSTALLMENT_AMOUNT' },
+                { id: 'editInstallmentFreqPrincipal', field: 'INSTALLMENT_FREQ_PRINCIPAL' },
+                { id: 'editInstallmentFreqInterest', field: 'INSTALLMENT_FREQ_INTEREST' },
+                { id: 'editIsGovtBacked', field: 'IS_GOVT_BACKED' },
+                { id: 'editRiskGrade', field: 'RISK_GRADE' },
+                
+                // Date Information
+                { id: 'editGrantDate', field: 'GRANT_DATE' },
+                { id: 'editExpiryDate', field: 'EXPIRY_DATE' },
+                { id: 'editBusinessDate', field: 'BUSINESS_DATE' },
+                { id: 'editDateRated', field: 'DATE_RATED' },
+                
+                // Loan Details
+                { id: 'editLoanType', field: 'LOAN_TYPE' },
+                { id: 'editLoanDescription', field: 'LOAN_DESCRIPTION' },
+                { id: 'editLoanProduct', field: 'LOAN_PRODUCT' },
+                { id: 'editLoanId', field: 'LOANID' },
+                { id: 'editLType', field: 'LTYPE' },
+                { id: 'editTermOfPayment', field: 'TERM_OF_PAYMENT' },
+                
+                // Classification
+                { id: 'editEconomicSector', field: 'ECONOMIC_SECTOR' },
+                { id: 'editIndustry', field: 'INDUSTRY' },
+                { id: 'editOwnership', field: 'OWNERSHIP' },
+                { id: 'editSector', field: 'SECTOR' },
+                
+                // Product Owner
+                { id: 'editProductOwner', field: 'PRODUCT_OWNER' },
+                { id: 'editTenure', field: 'TENURE' },
+                { id: 'editTerm', field: 'TERM' },
+                { id: 'editFiscalQuarter', field: 'fiscal_quarter' },
+                
+                // Collateral Information
+                { id: 'editCollateral', field: 'COLLATTERAL' },
+                { id: 'editCollateralValue', field: 'COLLATERAL_VALUE' },
+                { id: 'editAmountRange', field: 'AMOUNT_RANGE' },
+                { id: 'editCollateralRange', field: 'COLLATERAL_RANGE' },
+                
+                // Geographic Information
+                { id: 'editLatitude', field: 'Latitude' },
+                { id: 'editLongitude', field: 'Longitude' }
+            ];
+            
+            console.log('Starting field population...');
+            let populatedCount = 0;
+            let missingFields = [];
+            let missingElements = [];
+            
+            fields.forEach(fieldConfig => {
+                const element = document.getElementById(fieldConfig.id);
+                if (element) {
+                    const value = customer[fieldConfig.field];
+                    if (value !== undefined && value !== null && value !== '') {
+                        element.value = value;
+                        console.log(`Set ${fieldConfig.id} to: ${value} (from field: ${fieldConfig.field})`);
+                        populatedCount++;
+                    } else {
+                        console.log(`Field ${fieldConfig.field} not found in customer data or is empty for ${fieldConfig.id}`);
+                        missingFields.push(fieldConfig.field);
+                        element.value = ''; // Ensure empty string for missing fields
+                    }
+                } else {
+                    console.error(`Element ${fieldConfig.id} not found in form`);
+                    missingElements.push(fieldConfig.id);
+                }
+            });
+            
+            console.log(`Field population complete. Populated: ${populatedCount}, Missing fields: ${missingFields.length}, Missing elements: ${missingElements.length}`);
+            console.log('Missing fields:', missingFields);
+            console.log('Missing elements:', missingElements);
+            
+            console.log('Form fields populated successfully');
+            
+            const modal = document.getElementById('editCustomerModal');
+            console.log('Modal element:', modal);
+            if (modal) {
+                modal.classList.remove('hidden');
+                console.log('Modal should now be visible');
+            } else {
+                console.error('editCustomerModal element not found');
+            }
+        }
+        
+        function testEditFunction() {
+            console.log('Test Edit Function Called');
+            console.log('Customers available:', customers);
+            console.log('Customers length:', customers.length);
+            
+            if (customers.length > 0) {
+                const firstCustomer = customers[0];
+                console.log('First customer:', firstCustomer);
+                console.log('First customer ID:', firstCustomer.id);
+                
+                // Try to call editCustomer with first customer
+                try {
+                    editCustomer(firstCustomer.id);
+                    console.log('editCustomer called successfully');
+                } catch (error) {
+                    console.error('Error calling editCustomer:', error);
+                }
+            } else {
+                console.log('No customers available to test with');
+                alert('No customers available. Please load customers first.');
+            }
+        }
+        
+        function closeEditCustomerModal() {
+            document.getElementById('editCustomerModal').classList.add('hidden');
+            document.getElementById('editCustomerForm').reset();
+        }
+        
+        async function updateCustomer() {
+            const customerId = document.getElementById('editCustomerHiddenId').value;
+            const formData = new FormData(document.getElementById('editCustomerForm'));
+            const data = Object.fromEntries(formData);
+            
+            try {
+                const response = await fetch(`/api/customers/${customerId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Customer updated successfully!');
+                    closeEditCustomerModal();
+                    loadCustomers(); // Refresh list
+                } else {
+                    alert('Error updating customer: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error updating customer:', error);
+                alert('Failed to update customer');
+            }
+        }
+        
+        async function predictRisk(customerId) {
+            try {
+                const response = await fetch(`/api/customers/${customerId}/predict`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    const alertDiv = document.createElement('div');
+                    alertDiv.innerHTML = `
+                        <div style="font-family: Arial, sans-serif; max-width: 400px; margin: 20px auto; padding: 20px; border: 2px solid #4CAF50; border-radius: 8px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                            <div style="display: flex; align-items: center; margin-bottom: 15px;">
+                                <div style="width: 12px; height: 12px; border-radius: 50%; background: ${result.prediction === 'SME' ? '#F97316' : result.prediction === 'NPL' ? '#EF4444' : '#10B981'}; margin-right: 8px;"></div>
+                                <h3 style="margin: 0; color: #333; font-size: 18px;">Risk Prediction Complete</h3>
+                            </div>
+                            <div style="background: #f9f9f9; padding: 15px; border-radius: 6px;">
+                                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+                                    <div><strong>Status:</strong> ${result.prediction}</div>
+                                    <div><strong>SME Probability:</strong> ${result.all_probabilities && result.all_probabilities.SME ? (result.all_probabilities.SME * 100).toFixed(2) + '%' : 'N/A'}</div>
+                                    <div><strong>Risk Level:</strong> <span style="color: ${result.prediction === 'SME' ? '#F97316' : result.prediction === 'NPL' ? '#EF4444' : '#10B981'}; font-weight: bold;">${result.risk_level}</span></div>
+                                </div>
+                            </div>
+                            <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid #e5e7eb;">
+                                <button onclick="this.parentElement.remove()" style="background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; float: right; margin-top: 10px;">Close</button>
+                            </div>
+                        </div>
+                    `;
+                    
+                    const modalOverlay = document.createElement('div');
+                    modalOverlay.style.cssText = `
+                        position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0, 0, 0, 0.5); z-index: 9999; display: flex; align-items: center; justify-content: center;
+                    `;
+                    
+                    modalOverlay.appendChild(alertDiv);
+                    document.body.appendChild(modalOverlay);
+                    
+                    setTimeout(() => {
+                        if (modalOverlay.parentElement) {
+                            modalOverlay.parentElement.removeChild(modalOverlay);
+                        }
+                    }, 5000);
+                    
+                    modalOverlay.addEventListener('click', () => {
+                        if (modalOverlay.parentElement) {
+                            modalOverlay.parentElement.removeChild(modalOverlay);
+                        }
+                    });
+                    
+                    loadCustomers(); // Refresh list to show updated prediction
+                } else {
+                    alert('Error predicting risk: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error predicting risk:', error);
+                alert('Failed to predict risk');
+            }
+        }
+        
+        async function deleteCustomer(customerId) {
+            if (!confirm('Are you sure you want to delete this customer? This action cannot be undone.')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/api/customers/${customerId}`, {
+                    method: 'DELETE'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    alert('Customer deleted successfully!');
+                    loadCustomers(); // Refresh list
+                } else {
+                    alert('Error deleting customer: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Error deleting customer:', error);
+                alert('Failed to delete customer');
+            }
+        }
+        
+        // Search functionality
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            const filteredCustomers = customers.filter(customer => 
+                customer.CONTRACT_CODE?.toLowerCase().includes(searchTerm) ||
+                customer.CUST_SHORTNAME?.toLowerCase().includes(searchTerm) ||
+                customer.ECONOMIC_SECTOR?.toLowerCase().includes(searchTerm) ||
+                customer.DISTRICTNAME?.toLowerCase().includes(searchTerm)
+            );
+            displayCustomers(filteredCustomers);
+            document.getElementById('customerCount').textContent = `${filteredCustomers.length} customers`;
+        });
+    </script>
+</body>
+</html>

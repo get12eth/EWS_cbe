@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>CBE EWS Dashboard - Login</title>
+    <link rel="stylesheet" href="/static/login.css">
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="login-card">
+        <div class="logo">
+          <img src="/static/image/cbe_l.jpg" alt="CBE Logo" class="w-16 h-16 rounded-lg object-cover">
+        </div>
+        <h1>Welcome Back</h1>
+        <p class="subtitle">Sign in to access the CBE EWS Dashboard</p>
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        <form action="/" method="post" class="login-form">
+          <div class="form-group">
+            <label for="username">Username</label>
+            <input type="text" id="username" name="username" required placeholder="Enter your username">
+          </div>
+          <div class="form-group">
+            <label for="password">Password</label>
+            <input type="password" id="password" name="password" required placeholder="Enter your password">
+          </div>
+          <button type="submit" class="login-btn">Sign In</button>
+        </form>
+        <div class="footer">
+          <p>© 2026 Commercial Bank of Ethiopia</p>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

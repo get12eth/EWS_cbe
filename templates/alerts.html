@@ -1,0 +1,586 @@
+{% extends "base.html" %}
+
+{% set title = "SME Alerts Management" %}
+{% set page_title = "SME Alerts Management" %}
+{% set page_description = "Monitor and manage SME prediction alerts" %}
+{% set active_page = "alerts" %}
+
+{% block content %}
+<div class="space-y-6">
+    <!-- Alert Summary Cards -->
+    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-orange-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i data-lucide="alert-triangle" class="w-8 h-8 text-orange-500"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-900" id="totalAlerts">0</h3>
+                    <p class="text-sm text-gray-500">Total SME Alerts</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-red-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i data-lucide="alert-circle" class="w-8 h-8 text-red-500"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-900" id="highPriorityAlerts">0</h3>
+                    <p class="text-sm text-gray-500">High Priority</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-yellow-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i data-lucide="clock" class="w-8 h-8 text-yellow-500"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-900" id="openAlerts">0</h3>
+                    <p class="text-sm text-gray-500">Open Alerts</p>
+                </div>
+            </div>
+        </div>
+        
+        <div class="bg-white rounded-lg shadow p-6 border-l-4 border-green-500">
+            <div class="flex items-center">
+                <div class="flex-shrink-0">
+                    <i data-lucide="check-circle" class="w-8 h-8 text-green-500"></i>
+                </div>
+                <div class="ml-4">
+                    <h3 class="text-lg font-semibold text-gray-900" id="resolvedAlerts">0</h3>
+                    <p class="text-sm text-gray-500">Resolved Today</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Filters -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <div class="flex flex-wrap gap-4 items-center">
+            <div class="flex-1 min-w-0">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Search Alerts</label>
+                <input type="text" id="alertSearch" placeholder="Search by contract code or description..." 
+                       class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+                <select id="severityFilter" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Severities</option>
+                    <option value="critical">Critical</option>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <select id="statusFilter" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Status</option>
+                    <option value="open">Open</option>
+                    <option value="acknowledged">Acknowledged</option>
+                    <option value="escalated">Escalated</option>
+                    <option value="resolved">Resolved</option>
+                </select>
+            </div>
+            
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Branch</label>
+                <select id="branchFilter" class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <option value="">All Branches</option>
+                </select>
+            </div>
+            
+            <div class="flex items-end">
+                <button onclick="refreshAlerts()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center">
+                    <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i>
+                    Refresh
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SME Scheduler Info -->
+    <div id="smeSchedulerInfo" class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-md font-semibold text-gray-900 mb-2">SME Populate Scheduler</h3>
+        <div class="text-sm text-gray-600">Loading scheduler settings...</div>
+    </div>
+
+    <!-- Active Alerts Table -->
+    <div class="bg-white rounded-lg shadow">
+        <div class="px-6 py-4 border-b border-gray-200">
+            <div class="flex items-center justify-between">
+                <h3 class="text-lg font-semibold text-gray-900">SME Prediction Alerts</h3>
+                <div class="flex items-center space-x-2">
+                    <span class="text-sm text-gray-500">Last updated:</span>
+                    <span id="lastUpdated" class="text-sm font-medium text-gray-700">Never</span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50">
+                    <tr>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Alert ID</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contract Code</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Branch</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Severity</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="alertsTableBody" class="bg-white divide-y divide-gray-200">
+                    <tr>
+                        <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                            <div class="flex flex-col items-center">
+                                <i data-lucide="inbox" class="w-12 h-12 text-gray-300 mb-2"></i>
+                                <p>Loading SME alerts...</p>
+                            </div>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- Branch Alert Statistics -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold text-gray-900 mb-4">Branch Alert Statistics</h3>
+        <div id="branchStats" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div class="text-center text-gray-500">
+                <i data-lucide="bar-chart" class="w-8 h-8 mx-auto mb-2 text-gray-300"></i>
+                <p>Loading branch statistics...</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Alert Details Modal -->
+<div id="alertModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div class="relative top-20 mx-auto p-5 border w-full max-w-2xl shadow-lg rounded-md bg-white">
+        <div class="mt-3">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-lg font-medium text-gray-900">Alert Details</h3>
+                <button onclick="closeAlertModal()" class="text-gray-400 hover:text-gray-600">
+                    <i data-lucide="x" class="w-6 h-6"></i>
+                </button>
+            </div>
+            
+            <div id="alertDetails" class="space-y-4">
+                <!-- Alert details will be populated here -->
+            </div>
+            
+            <div class="flex justify-end space-x-3 mt-6">
+                <button onclick="closeAlertModal()" class="px-4 py-2 bg-gray-300 text-gray-700 rounded-md hover:bg-gray-400">
+                    Close
+                </button>
+                <button id="acknowledgeBtn" onclick="acknowledgeAlert()" class="px-4 py-2 bg-yellow-600 text-white rounded-md hover:bg-yellow-700">
+                    Acknowledge
+                </button>
+                <button id="escalateBtn" onclick="escalateAlert()" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
+                    Escalate
+                </button>
+                <button id="resolveBtn" onclick="resolveAlert()" class="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
+                    Resolve
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+let currentAlerts = [];
+let currentAlertId = null;
+
+// Load alerts on page load
+document.addEventListener('DOMContentLoaded', function() {
+    refreshAlerts();
+    // Auto-refresh every 30 seconds
+    setInterval(refreshAlerts, 30000);
+});
+
+async function refreshAlerts() {
+    try {
+        const response = await fetch('/api/alerts/dashboard');
+        const data = await response.json();
+        
+        if (data.recent_alerts) {
+            currentAlerts = data.recent_alerts;
+            updateAlertSummary(data.alert_summary);
+            updateAlertsTable(data.recent_alerts);
+            updateBranchStats(data.branch_alerts);
+            updateLastUpdated(data.last_updated);
+        }
+        // Always update scheduler display if provided
+        if (data.sme_scheduler) {
+            updateSchedulerInfo(data.sme_scheduler);
+        }
+    } catch (error) {
+        console.error('Error loading alerts:', error);
+        showError('Failed to load alerts');
+    }
+}
+
+function updateSchedulerInfo(scheduler) {
+    const container = document.getElementById('smeSchedulerInfo');
+    if (!scheduler) {
+        container.innerHTML = '<h3 class="text-md font-semibold text-gray-900 mb-2">SME Populate Scheduler</h3><div class="text-sm text-gray-600">Not configured</div>';
+        return;
+    }
+
+    const interval = scheduler.interval_minutes || 'N/A';
+    const lookback = scheduler.lookback_hours || 'N/A';
+    const threshold = (typeof scheduler.threshold !== 'undefined') ? scheduler.threshold : 'N/A';
+
+    container.innerHTML = `
+        <h3 class="text-md font-semibold text-gray-900 mb-2">SME Populate Scheduler</h3>
+        <div class="grid grid-cols-3 gap-4 text-sm text-gray-700">
+            <div>
+                <div class="text-xs text-gray-500">Interval</div>
+                <div class="font-medium">${interval} minutes</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500">Lookback</div>
+                <div class="font-medium">${lookback} hours</div>
+            </div>
+            <div>
+                <div class="text-xs text-gray-500">SME Threshold</div>
+                <div class="font-medium">${threshold}</div>
+            </div>
+        </div>
+    `;
+}
+
+function updateAlertSummary(summary) {
+    document.getElementById('totalAlerts').textContent = summary?.total_alerts || 0;
+    document.getElementById('highPriorityAlerts').textContent = (summary?.critical_alerts || 0) + (summary?.high_alerts || 0);
+    document.getElementById('openAlerts').textContent = summary?.open_alerts || 0;
+    document.getElementById('resolvedAlerts').textContent = summary?.resolved_alerts || 0;
+}
+
+function updateAlertsTable(alerts) {
+    const tbody = document.getElementById('alertsTableBody');
+    
+    if (!alerts || alerts.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="8" class="px-6 py-4 text-center text-gray-500">
+                    <div class="flex flex-col items-center">
+                        <i data-lucide="check-circle" class="w-12 h-12 text-green-300 mb-2"></i>
+                        <p>No SME alerts found</p>
+                    </div>
+                </td>
+            </tr>
+        `;
+        return;
+    }
+    
+    tbody.innerHTML = alerts.map(alert => `
+        <tr class="hover:bg-gray-50">
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                ${alert.alert_id}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                ${alert.contract_code}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                ${alert.branch_name || 'N/A'}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getSeverityClass(alert.severity)}">
+                    ${alert.severity}
+                </span>
+            </td>
+            <td class="px-6 py-4 text-sm text-gray-900">
+                <div class="max-w-xs truncate" title="${alert.description}">
+                    ${alert.description}
+                </div>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap">
+                <span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${getStatusClass(alert.status)}">
+                    ${alert.status}
+                </span>
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                ${formatDate(alert.created_at)}
+            </td>
+            <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                <button onclick="viewAlertDetails('${alert.alert_id}')" class="text-blue-600 hover:text-blue-900 mr-3">
+                    View
+                </button>
+                ${alert.status === 'open' ? `
+                    <button onclick="acknowledgeAlert('${alert.alert_id}')" class="text-yellow-600 hover:text-yellow-900 mr-3">
+                        Acknowledge
+                    </button>
+                ` : ''}
+                ${['open', 'acknowledged'].includes(alert.status) ? `
+                    <button onclick="escalateAlert('${alert.alert_id}')" class="text-purple-600 hover:text-purple-900 mr-3">
+                        Escalate
+                    </button>
+                    <button onclick="resolveAlert('${alert.alert_id}')" class="text-green-600 hover:text-green-900">
+                        Resolve
+                    </button>
+                ` : ''}
+            </td>
+        </tr>
+    `).join('');
+    
+    // Re-initialize Lucide icons
+    lucide.createIcons();
+}
+
+function updateBranchStats(branchAlerts) {
+    const container = document.getElementById('branchStats');
+    
+    if (!branchAlerts || branchAlerts.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-gray-500 col-span-full">
+                <i data-lucide="bar-chart" class="w-8 h-8 mx-auto mb-2 text-gray-300"></i>
+                <p>No branch data available</p>
+            </div>
+        `;
+        return;
+    }
+    
+    container.innerHTML = branchAlerts.map(branch => `
+        <div class="bg-gray-50 rounded-lg p-4">
+            <div class="flex items-center justify-between mb-2">
+                <h4 class="font-medium text-gray-900">${branch.branch_name}</h4>
+                <span class="text-sm text-gray-500">${branch.alert_count} alerts</span>
+            </div>
+            <div class="flex items-center">
+                <div class="flex-1 bg-gray-200 rounded-full h-2 mr-2">
+                    <div class="bg-orange-500 h-2 rounded-full" style="width: ${(branch.high_priority_count / branch.alert_count * 100)}%"></div>
+                </div>
+                <span class="text-xs text-gray-500">${branch.high_priority_count} high priority</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+function getSeverityClass(severity) {
+    const classes = {
+        'critical': 'bg-red-100 text-red-800',
+        'high': 'bg-orange-100 text-orange-800',
+        'medium': 'bg-yellow-100 text-yellow-800',
+        'low': 'bg-green-100 text-green-800'
+    };
+    return classes[severity] || 'bg-gray-100 text-gray-800';
+}
+
+function getStatusClass(status) {
+    const classes = {
+        'open': 'bg-red-100 text-red-800',
+        'acknowledged': 'bg-yellow-100 text-yellow-800',
+        'escalated': 'bg-purple-100 text-purple-800',
+        'resolved': 'bg-green-100 text-green-800'
+    };
+    return classes[status] || 'bg-gray-100 text-gray-800';
+}
+
+function formatDate(dateString) {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleString();
+}
+
+function updateLastUpdated(lastUpdated) {
+    document.getElementById('lastUpdated').textContent = lastUpdated ? formatDate(lastUpdated) : 'Never';
+}
+
+function viewAlertDetails(alertId) {
+    const alert = currentAlerts.find(a => a.alert_id === alertId);
+    if (!alert) return;
+    
+    currentAlertId = alertId;
+    
+    const detailsDiv = document.getElementById('alertDetails');
+    detailsDiv.innerHTML = `
+        <div class="grid grid-cols-2 gap-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Alert ID</label>
+                <p class="mt-1 text-sm text-gray-900">${alert.alert_id}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Contract Code</label>
+                <p class="mt-1 text-sm text-gray-900">${alert.contract_code}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Branch</label>
+                <p class="mt-1 text-sm text-gray-900">${alert.branch_name || 'N/A'}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Severity</label>
+                <span class="mt-1 inline-flex px-2 py-1 text-xs leading-5 font-semibold rounded-full ${getSeverityClass(alert.severity)}">
+                    ${alert.severity}
+                </span>
+            </div>
+            <div class="col-span-2">
+                <label class="block text-sm font-medium text-gray-700">Description</label>
+                <p class="mt-1 text-sm text-gray-900">${alert.description}</p>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Status</label>
+                <span class="mt-1 inline-flex px-2 py-1 text-xs leading-5 font-semibold rounded-full ${getStatusClass(alert.status)}">
+                    ${alert.status}
+                </span>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Created</label>
+                <p class="mt-1 text-sm text-gray-900">${formatDate(alert.created_at)}</p>
+            </div>
+        </div>
+    `;
+    
+    // Update button visibility based on status
+    document.getElementById('acknowledgeBtn').style.display = alert.status === 'open' ? 'inline-block' : 'none';
+    document.getElementById('resolveBtn').style.display = ['open', 'acknowledged'].includes(alert.status) ? 'inline-block' : 'none';
+    
+    // Show modal
+    document.getElementById('alertModal').classList.remove('hidden');
+    lucide.createIcons();
+}
+
+function closeAlertModal() {
+    document.getElementById('alertModal').classList.add('hidden');
+    currentAlertId = null;
+}
+
+async function acknowledgeAlert(alertId = null) {
+    const id = alertId || currentAlertId;
+    if (!id) return;
+    
+    try {
+        const response = await fetch(`/api/alerts/${id}/acknowledge`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: 'current_user' })
+        });
+        
+        if (response.ok) {
+            closeAlertModal();
+            refreshAlerts();
+            showSuccess('Alert acknowledged successfully');
+        } else {
+            showError('Failed to acknowledge alert');
+        }
+    } catch (error) {
+        console.error('Error acknowledging alert:', error);
+        showError('Error acknowledging alert');
+    }
+}
+
+async function resolveAlert(alertId = null) {
+    const id = alertId || currentAlertId;
+    if (!id) return;
+    
+    const notes = prompt('Please enter resolution notes:');
+    if (notes === null) return; // User cancelled
+    
+    try {
+        const response = await fetch(`/api/alerts/${id}/resolve`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+                user_id: 'current_user',
+                resolution_notes: notes 
+            })
+        });
+        
+        if (response.ok) {
+            closeAlertModal();
+            refreshAlerts();
+            showSuccess('Alert resolved successfully');
+        } else {
+            showError('Failed to resolve alert');
+        }
+    } catch (error) {
+        console.error('Error resolving alert:', error);
+        showError('Error resolving alert');
+    }
+}
+
+async function escalateAlert(alertId = null) {
+    const id = alertId || currentAlertId;
+    if (!id) return;
+
+    try {
+        const response = await fetch(`/api/alerts/${id}/escalate`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ user_id: 'current_user' })
+        });
+
+        if (response.ok) {
+            closeAlertModal();
+            refreshAlerts();
+            showSuccess('Alert escalated successfully');
+        } else {
+            showError('Failed to escalate alert');
+        }
+    } catch (error) {
+        console.error('Error escalating alert:', error);
+        showError('Error escalating alert');
+    }
+}
+
+function showSuccess(message) {
+    // Simple success notification
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg z-50';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+function showError(message) {
+    // Simple error notification
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-lg z-50';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    
+    setTimeout(() => {
+        notification.remove();
+    }, 3000);
+}
+
+// Filter functionality
+document.getElementById('alertSearch').addEventListener('input', filterAlerts);
+document.getElementById('severityFilter').addEventListener('change', filterAlerts);
+document.getElementById('statusFilter').addEventListener('change', filterAlerts);
+document.getElementById('branchFilter').addEventListener('change', filterAlerts);
+
+function filterAlerts() {
+    const searchTerm = document.getElementById('alertSearch').value.toLowerCase();
+    const severityFilter = document.getElementById('severityFilter').value;
+    const statusFilter = document.getElementById('statusFilter').value;
+    const branchFilter = document.getElementById('branchFilter').value;
+    
+    const filteredAlerts = currentAlerts.filter(alert => {
+        const matchesSearch = !searchTerm || 
+            alert.contract_code.toLowerCase().includes(searchTerm) ||
+            alert.description.toLowerCase().includes(searchTerm);
+        
+        const matchesSeverity = !severityFilter || alert.severity === severityFilter;
+        const matchesStatus = !statusFilter || alert.status === statusFilter;
+        const matchesBranch = !branchFilter || alert.branch_name === branchFilter;
+        
+        return matchesSearch && matchesSeverity && matchesStatus && matchesBranch;
+    });
+    
+    updateAlertsTable(filteredAlerts);
+}
+</script>
+{% endblock %}

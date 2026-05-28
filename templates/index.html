@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CBE EWS Dashboard</title>
+  <link rel="stylesheet" href="/static/dashboard.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+  <style>
+    .input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 1rem; }
+  </style>
+</head>
+<body class="bg-zinc-950 text-zinc-100 min-h-screen">
+
+<header class="dashboard-header">
+  <div class="max-w-6xl mx-auto px-8 py-4 flex justify-between items-center">
+    <div class="flex items-center space-x-4">
+      <div class="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-lg flex items-center justify-center">
+        <i data-lucide="building-2" class="w-6 h-6 text-white"></i>
+      </div>
+      <div>
+        <h1 class="text-xl font-bold text-white">CBE Loan Intelligence</h1>
+        <p class="text-zinc-400 text-sm">Loan Management Dashboard</p>
+      </div>
+    </div>
+    <div class="flex items-center space-x-4">
+      <span class="text-zinc-300">Welcome, {{ user }}</span>
+      <a href="/logout" class="px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-sm font-medium transition-colors flex items-center space-x-2">
+        <i data-lucide="log-out" class="w-4 h-4"></i>
+        <span>Logout</span>
+      </a>
+    </div>
+  </div>
+</header>
+
+<div class="max-w-6xl mx-auto p-8">
+  <!-- KPI Pulse -->
+  <div id="kpiPulse" class="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+    <div class="kpi-card p-6 rounded-2xl text-center">
+      <div class="flex justify-center mb-3">
+        <i data-lucide="file-text" class="w-8 h-8 text-indigo-400"></i>
+      </div>
+      <p class="text-zinc-400 text-sm">Total Portfolio</p>
+      <p id="k_total" class="text-3xl font-semibold text-white">—</p>
+    </div>
+    <div class="kpi-card p-6 rounded-2xl text-center">
+      <div class="flex justify-center mb-3">
+        <i data-lucide="alert-triangle" class="w-8 h-8 text-red-400"></i>
+      </div>
+      <p class="text-zinc-400 text-sm">NPL %</p>
+      <p id="k_npl" class="text-3xl font-semibold text-white">—</p>
+    </div>
+    <div class="kpi-card p-6 rounded-2xl text-center">
+      <div class="flex justify-center mb-3">
+        <i data-lucide="trending-down" class="w-8 h-8 text-yellow-400"></i>
+      </div>
+      <p class="text-zinc-400 text-sm">Value at Risk (ETB)</p>
+      <p id="k_var" class="text-3xl font-semibold text-white">—</p>
+    </div>
+    <div class="kpi-card p-6 rounded-2xl text-center">
+      <div class="flex justify-center mb-3">
+        <i data-lucide="clock" class="w-8 h-8 text-green-400"></i>
+      </div>
+      <p class="text-zinc-400 text-sm">Avg Loan Age (days)</p>
+      <p id="k_age" class="text-3xl font-semibold text-white">—</p>
+    </div>
+  </div>
+  <div class="text-center mb-10">
+    <div class="flex justify-center mb-4">
+      <i data-lucide="brain" class="w-16 h-16 text-indigo-400"></i>
+    </div>
+    <h1 class="text-5xl font-bold bg-gradient-to-r from-indigo-400 to-purple-400 bg-clip-text text-transparent">CBE Loan Intelligence</h1>
+    <p class="text-zinc-400 mt-2 text-lg">Predict loan status with smart feature engineering</p>
+  </div>
+
+  <div class="bg-zinc-900 rounded-3xl shadow-2xl p-10">
+    <div class="flex items-center mb-8">
+      <i data-lucide="clipboard-list" class="w-8 h-8 text-indigo-400 mr-3"></i>
+      <h2 class="text-2xl font-semibold">Loan Information</h2>
+    </div>
+
+    <div class="form-section">
+      <h3 class="text-lg font-medium text-indigo-400 mb-4 flex items-center">
+        <i data-lucide="map-pin" class="w-5 h-5 mr-2"></i>
+        Location & Branch Details
+      </h3>
+      <div class="input-grid">
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">DISTRICTNAME</label>
+          <select id="DISTRICTNAME" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select District</option>
+            <option value="KIRKOS">KIRKOS</option>
+            <option value="ARADA">ARADA</option>
+            <option value="HAWASSA">HAWASSA</option>
+            <option value="MERKATO">MERKATO</option>
+            <option value="DEBRE BREHAN">DEBRE BREHAN</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">REGIONNAME</label>
+          <select id="REGIONNAME" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Region</option>
+            <option value="ADDIS ABABA">ADDIS ABABA</option>
+            <option value="SIDAMA">SIDAMA</option>
+            <option value="AMHARA">AMHARA</option>
+            <option value="OROMIYA">OROMIYA</option>
+            <option value="CENTAL ETHIOPIA">CENTAL ETHIOPIA</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">CBE_REGION</label>
+          <select id="CBE_REGION" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Region</option>
+            <option value="CENTRAL">CENTRAL</option>
+            <option value="SOUTH WEST">SOUTH WEST</option>
+            <option value="NORTH EAST">NORTH EAST</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">BRANCHNAME</label>
+          <select id="BRANCHNAME" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Branch</option>
+            <option value="Minasie Lema Branch">Minasie Lema Branch</option>
+            <option value="Arada Giorgis Branch">Arada Giorgis Branch</option>
+            <option value="Addis Ababa Branch">Addis Ababa Branch</option>
+            <option value="Aleta Wondo Branch">Aleta Wondo Branch</option>
+            <option value="Addis Ketema Branch">Addis Ketema Branch</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="text-lg font-medium text-indigo-400 mb-4 flex items-center">
+        <i data-lucide="credit-card" class="w-5 h-5 mr-2"></i>
+        Loan Details
+      </h3>
+      <div class="input-grid">
+        <div><label class="block text-sm text-zinc-400 mb-1">APPROVED_AMOUNT</label><input type="number" step="0.01" id="APPROVED_AMOUNT" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">TENURE</label>
+          <select id="TENURE" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Tenure</option>
+            <option value="Long Term">Long Term</option>
+            <option value="Short Term">Short Term</option>
+            <option value="Medium Term">Medium Term</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">TERM</label>
+          <select id="TERM" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Term</option>
+            <option value="SHORT TERM">SHORT TERM</option>
+            <option value="MEDIUM">MEDIUM</option>
+            <option value="LONG TERM">LONG TERM</option>
+            <option value="MEDIUM TERM">MEDIUM TERM</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">LOAN_TYPE</label>
+          <select id="LOAN_TYPE" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Type</option>
+            <option value="TL">TL</option>
+            <option value="ML">ML</option>
+            <option value="AL">AL</option>
+            <option value="OD">OD</option>
+            <option value="CB">CB</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">LOAN_DESCRIPTION</label>
+          <select id="LOAN_DESCRIPTION" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Description</option>
+            <option value="Home Loan">Home Loan</option>
+            <option value="Motor Vehicle Loan">Motor Vehicle Loan</option>
+            <option value="Consumer Durables Loan">Consumer Durables Loan</option>
+            <option value="Education Loan">Education Loan</option>
+            <option value="Working Capital & Project Loan">Working Capital & Project Loan</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">LOAN_PRODUCT</label>
+          <select id="LOAN_PRODUCT" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Product</option>
+            <option value="HOME.RES">HOME.RES</option>
+            <option value="CAR.LOAN">CAR.LOAN</option>
+            <option value="CONS.DURABLE">CONS.DURABLE</option>
+            <option value="EDU.LOAN">EDU.LOAN</option>
+            <option value="TERM.LOAN">TERM.LOAN</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">LTYPE</label>
+          <select id="LTYPE" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Type</option>
+            <option value="AA">AA</option>
+            <option value="OD">OD</option>
+            <option value="LD">LD</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="text-lg font-medium text-indigo-400 mb-4 flex items-center">
+        <i data-lucide="dollar-sign" class="w-5 h-5 mr-2"></i>
+        Financial Information
+      </h3>
+      <div class="input-grid">
+        <div><label class="block text-sm text-zinc-400 mb-1">PRINCIPAL_OS</label><input type="number" step="0.01" id="PRINCIPAL_OS" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div><label class="block text-sm text-zinc-400 mb-1">INTEREST_OS</label><input type="number" step="0.01" id="INTEREST_OS" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div><label class="block text-sm text-zinc-400 mb-1">PRINCIPAL_ARREARS</label><input type="number" step="0.01" id="PRINCIPAL_ARREARS" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div><label class="block text-sm text-zinc-400 mb-1">CURRENT_COMMITTMENT</label><input type="number" step="0.01" id="CURRENT_COMMITTMENT" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div><label class="block text-sm text-zinc-400 mb-1">INSTALLMENT_AMOUNT</label><input type="number" step="0.01" id="INSTALLMENT_AMOUNT" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="text-lg font-medium text-indigo-400 mb-4 flex items-center">
+        <i data-lucide="briefcase" class="w-5 h-5 mr-2"></i>
+        Business & Collateral
+      </h3>
+      <div class="input-grid">
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">ECONOMIC_SECTOR</label>
+          <select id="ECONOMIC_SECTOR" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Sector</option>
+            <option value="Consumer and staff loans">Consumer and staff loans</option>
+            <option value="other sector">other sector</option>
+            <option value="Domestic Trade">Domestic Trade</option>
+            <option value="Transport and Communication">Transport and Communication</option>
+            <option value="Buliding  and Construction">Buliding and Construction</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">INDUSTRY</label>
+          <select id="INDUSTRY" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Industry</option>
+            <option value="Other individuals">Other individuals</option>
+            <option value="Passenger road transport">Passenger road transport</option>
+            <option value="Retail agriculture products">Retail agriculture products</option>
+            <option value="Staff of CBE">Staff of CBE</option>
+            <option value="Real Estate Development">Real Estate Development</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">OWNERSHIP</label>
+          <select id="OWNERSHIP" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Ownership</option>
+            <option value="PRIVATE">PRIVATE</option>
+            <option value="COOPRATIVE">COOPRATIVE</option>
+            <option value="PUBLIC">PUBLIC</option>
+            <option value="GOVERNMENT">GOVERNMENT</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">SECTOR</label>
+          <select id="SECTOR" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Sector</option>
+            <option value="Individual">Individual</option>
+            <option value="DOMESTIC TRADE">DOMESTIC TRADE</option>
+            <option value="Transportation & storage">Transportation & storage</option>
+            <option value="Construction">Construction</option>
+            <option value="Agricultur hunt forestry & fishing">Agricultur hunt forestry & fishing</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">TERM_OF_PAYMENT</label>
+          <select id="TERM_OF_PAYMENT" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Payment Term</option>
+            <option value="Monthly">Monthly</option>
+            <option value="Quarterly">Quarterly</option>
+            <option value="Half Yearly">Half Yearly</option>
+            <option value="Annually">Annually</option>
+            <option value="Bullrt (One lump sum upon Maturity)">Bullet (One lump sum upon Maturity)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">PRODUCT_OWNER</label>
+          <select id="PRODUCT_OWNER" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Owner</option>
+            <option value="KIRKOS">KIRKOS</option>
+            <option value="ARADA">ARADA</option>
+            <option value="HAWASSA">HAWASSA</option>
+            <option value="MERKATO">MERKATO</option>
+            <option value="DEBRE BREHAN">DEBRE BREHAN</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">COLLATTERAL</label>
+          <select id="COLLATTERAL" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Collateral</option>
+            <option value="Residential Houses">Residential Houses</option>
+            <option value="UNSECURED">UNSECURED</option>
+            <option value="Premises, Buildings & Houses">Premises, Buildings & Houses</option>
+            <option value="Commercial Building">Commercial Building</option>
+            <option value="Dump Trucks">Dump Trucks</option>
+          </select>
+        </div>
+        <div><label class="block text-sm text-zinc-400 mb-1">COLLATERAL_VALUE</label><input type="number" step="0.01" id="COLLATERAL_VALUE" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+      </div>
+    </div>
+
+    <div class="form-section">
+      <h3 class="text-lg font-medium text-indigo-400 mb-4 flex items-center">
+        <i data-lucide="map" class="w-5 h-5 mr-2"></i>
+        Geographic & Temporal Data
+      </h3>
+      <div class="input-grid">
+        <div><label class="block text-sm text-zinc-400 mb-1">Latitude</label><input type="number" step="0.000001" id="Latitude" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div><label class="block text-sm text-zinc-400 mb-1">Longitude</label><input type="number" step="0.000001" id="Longitude" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">AMOUNT_RANGE</label>
+          <select id="AMOUNT_RANGE" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Range</option>
+            <option value="<100k">&lt;100k</option>
+            <option value="100k-500k">100k-500k</option>
+            <option value="500k-1M">500k-1M</option>
+            <option value="1M-5M">1M-5M</option>
+            <option value="5M-10M">5M-10M</option>
+            <option value=">10M">&gt;10M</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-sm text-zinc-400 mb-1">COLLATERAL_RANGE</label>
+          <select id="COLLATERAL_RANGE" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required>
+            <option value="">Select Range</option>
+            <option value="<500k">&lt;500k</option>
+            <option value="500k-2M">500k-2M</option>
+            <option value="2M-5M">2M-5M</option>
+            <option value="5M-10M">5M-10M</option>
+            <option value="10M-50M">10M-50M</option>
+            <option value=">50M">&gt;50M</option>
+            <option value="Unknown">Unknown</option>
+          </select>
+        </div>
+        <div><label class="block text-sm text-zinc-400 mb-1">GRANT_DATE</label><input type="date" id="GRANT_DATE" max="2100-12-31" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div><label class="block text-sm text-zinc-400 mb-1">EXPIRY_DATE</label><input type="date" id="EXPIRY_DATE" max="2100-12-31" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div><label class="block text-sm text-zinc-400 mb-1">BUSINESS_DATE</label><input type="date" id="BUSINESS_DATE" max="2100-12-31" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+        <div><label class="block text-sm text-zinc-400 mb-1">Fiscal Quarter (e.g. FY2026 Q2)</label><input type="text" id="fiscal_quarter" placeholder="FY2026 Q2" class="w-full bg-zinc-800 border border-zinc-700 rounded-2xl p-4" required></div>
+      </div>
+    </div>
+
+    <button onclick="submitForm()" 
+            class="btn-primary mt-10 w-full font-bold py-5 rounded-2xl text-xl text-white">
+      <i data-lucide="zap" class="w-6 h-6 inline mr-2"></i>
+      Predict Loan Status
+    </button>
+  </div>
+
+  <!-- Result -->
+  <div id="result" class="hidden mt-12 result-card p-10">
+    <div class="flex items-center mb-6">
+      <i data-lucide="check-circle" class="w-8 h-8 text-emerald-400 mr-3"></i>
+      <h3 class="text-3xl font-bold text-emerald-400">Prediction Result</h3>
+    </div>
+    <p id="status" class="text-6xl font-bold text-center py-8"></p>
+
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-6">
+      <div class="kpi-card p-6 rounded-2xl text-center">
+        <div class="flex justify-center mb-3">
+          <i data-lucide="calendar" class="w-6 h-6 text-blue-400"></i>
+        </div>
+        <p class="text-zinc-400 text-sm">Total Loan Days</p>
+        <p id="totalDays" class="text-3xl font-semibold text-white"></p>
+      </div>
+      <div class="kpi-card p-6 rounded-2xl text-center">
+        <div class="flex justify-center mb-3">
+          <i data-lucide="clock" class="w-6 h-6 text-green-400"></i>
+        </div>
+        <p class="text-zinc-400 text-sm">Loan Age (Days)</p>
+        <p id="ageDays" class="text-3xl font-semibold text-white"></p>
+      </div>
+      <div class="kpi-card p-6 rounded-2xl text-center">
+        <div class="flex justify-center mb-3">
+          <i data-lucide="bar-chart-3" class="w-6 h-6 text-purple-400"></i>
+        </div>
+        <p class="text-zinc-400 text-sm">Quarter</p>
+        <p id="quarter" class="text-3xl font-semibold text-white"></p>
+      </div>
+      <div class="kpi-card p-6 rounded-2xl text-center">
+        <div class="flex justify-center mb-3">
+          <i data-lucide="dollar-sign" class="w-6 h-6 text-yellow-400"></i>
+        </div>
+        <p class="text-zinc-400 text-sm">Approved Amount</p>
+        <p id="amount" class="text-3xl font-semibold text-white"></p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Predictive & Temporal -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
+    <div class="chart-container">
+      <div class="flex items-center mb-6">
+        <i data-lucide="alert-triangle" class="w-6 h-6 text-orange-400 mr-3"></i>
+        <h3 class="text-xl font-semibold">Early Warning Signals (EWS)</h3>
+      </div>
+      <table id="ewsTable" class="w-full text-left text-sm">
+        <thead><tr><th>Contract</th><th>District</th><th>Sector</th><th>Principal</th><th>NPL Prob</th><th>Action</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="chart-container">
+      <div class="flex items-center mb-6">
+        <i data-lucide="trending-up" class="w-6 h-6 text-blue-400 mr-3"></i>
+        <h3 class="text-xl font-semibold">Temporal Analysis</h3>
+      </div>
+      <canvas id="quarterChart" class="mb-6" height="120"></canvas>
+      <canvas id="vintageChart" height="120"></canvas>
+    </div>
+  </div>
+
+  <!-- Map & Sector -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-8">
+    <div class="chart-container">
+      <div class="flex items-center mb-6">
+        <i data-lucide="map" class="w-6 h-6 text-green-400 mr-3"></i>
+        <h3 class="text-xl font-semibold">Geospatial Risk (scatter)</h3>
+      </div>
+      <canvas id="heatmapCanvas" height="240"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="flex items-center mb-6">
+        <i data-lucide="pie-chart" class="w-6 h-6 text-purple-400 mr-3"></i>
+        <h3 class="text-xl font-semibold">Sector Exposure</h3>
+      </div>
+      <canvas id="sectorChart" height="240"></canvas>
+    </div>
+  </div>
+
+  <!-- Drilldown / Explain -->
+  <div id="explainBox" class="hidden mt-8 chart-container">
+    <div class="flex items-center mb-4">
+      <i data-lucide="search" class="w-6 h-6 text-indigo-400 mr-3"></i>
+      <h3 class="text-lg font-semibold">Loan Explanation</h3>
+    </div>
+    <div id="explainContent"></div>
+  </div>
+
+  <!-- Charts -->
+  <div class="grid grid-cols-1 lg:grid-cols-2 gap-8 mt-12">
+    <div class="chart-container">
+      <div class="flex items-center mb-6">
+        <i data-lucide="bar-chart" class="w-6 h-6 text-red-400 mr-3"></i>
+        <h3 class="text-xl font-semibold">Loan Status Distribution</h3>
+      </div>
+      <canvas id="statusChart"></canvas>
+    </div>
+    <div class="chart-container">
+      <div class="flex items-center mb-6">
+        <i data-lucide="activity" class="w-6 h-6 text-cyan-400 mr-3"></i>
+        <h3 class="text-xl font-semibold">Loan Age vs Risk</h3>
+      </div>
+      <canvas id="ageChart"></canvas>
+    </div>
+  </div>
+</div>
+
+<footer class="mt-16 py-8 border-t border-zinc-800">
+  <div class="max-w-6xl mx-auto px-8 text-center">
+    <p class="text-zinc-400">© 2026 CBE Loan Risk Management System. Powered by AI & Machine Learning.</p>
+  </div>
+</footer>
+
+<script>
+async function submitForm() {
+  const button = document.querySelector('button[onclick="submitForm()"]');
+  const originalText = button.innerHTML;
+  button.innerHTML = '<div class="loading-spinner"></div> Processing...';
+  button.disabled = true;
+  
+  // Manually build the form body because inputs use IDs, not names
+  const params = new URLSearchParams();
+  
+  // Client-side date validation helpers
+  function isValidDateString(s) {
+    if (!s) return false;
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return false;
+    const y = d.getFullYear();
+    return y >= 1900 && y <= 2100;
+  }
+
+  const grantVal = document.getElementById('GRANT_DATE')?.value;
+  const expiryVal = document.getElementById('EXPIRY_DATE')?.value;
+  const businessVal = document.getElementById('BUSINESS_DATE')?.value;
+
+  if (!isValidDateString(grantVal) || !isValidDateString(expiryVal) || !isValidDateString(businessVal)) {
+    alert('Please enter valid dates (years between 1900 and 2100).');
+    return;
+  }
+
+  if (new Date(expiryVal) < new Date(grantVal)) {
+    alert('Expiry date must be the same or after Grant date.');
+    return;
+  }
+
+  // List of all IDs that match FastAPI parameters
+  const fields = [
+    'DISTRICTNAME', 'REGIONNAME', 'CBE_REGION', 'BRANCHNAME', 'APPROVED_AMOUNT',
+    'TENURE', 'TERM', 'LOAN_TYPE', 'LOAN_DESCRIPTION', 'LOAN_PRODUCT', 'LTYPE',
+    'PRINCIPAL_OS', 'INTEREST_OS', 'PRINCIPAL_ARREARS', 'CURRENT_COMMITTMENT',
+    'INSTALLMENT_AMOUNT', 'ECONOMIC_SECTOR', 'INDUSTRY', 'OWNERSHIP', 'SECTOR',
+    'TERM_OF_PAYMENT', 'PRODUCT_OWNER', 'COLLATTERAL', 'COLLATERAL_VALUE',
+    'Latitude', 'Longitude', 'AMOUNT_RANGE', 'COLLATERAL_RANGE',
+    'GRANT_DATE', 'EXPIRY_DATE', 'BUSINESS_DATE', 'fiscal_quarter'
+  ];
+
+  // Check for missing required fields before any further validation
+  const missingFields = [];
+  fields.forEach(field => {
+    const el = document.getElementById(field);
+    const val = el ? el.value : null;
+    if (val === null || String(val).trim() === '') missingFields.push(field);
+  });
+
+  if (missingFields.length > 0) {
+    alert('Please fill required fields: ' + missingFields.join(', '));
+    const first = document.getElementById(missingFields[0]);
+    if (first) first.focus();
+    return;
+  }
+
+  fields.forEach(field => {
+    const element = document.getElementById(field);
+    if (element && element.value) {
+      params.append(field, element.value);
+    }
+  });
+
+  try {
+    console.log("Sending prediction request...");
+    console.log("Form data:", Object.fromEntries(params.entries()));
+    
+    const res = await fetch('/predict', { 
+      method: 'POST', 
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: params 
+    });
+
+    console.log("Response status:", res.status);
+
+    if (!res.ok) {
+      const errorDetail = await res.json();
+      console.error("Validation Error:", errorDetail);
+      alert("Check all fields: " + JSON.stringify(errorDetail.detail));
+      return;
+    }
+
+    const data = await res.json();
+    console.log("Prediction result:", data);
+
+    // UI Update Logic
+    const resultDiv = document.getElementById('result');
+    resultDiv.classList.remove('hidden');
+
+    document.getElementById('status').innerHTML = `Status: <span class="text-emerald-400">${data.predicted_status}</span>`;
+    document.getElementById('totalDays').textContent = data.analysis.total_loan_days;
+    document.getElementById('ageDays').textContent = data.analysis.loan_age_days;
+    document.getElementById('quarter').textContent = "Q" + data.analysis.quarter_num;
+    document.getElementById('amount').textContent = "ETB " + Number(data.analysis.approved_amount).toLocaleString();
+
+    createCharts();
+    
+    // Scroll to result
+    document.getElementById('result').scrollIntoView({ behavior: 'smooth' });
+
+  } catch (err) {
+    console.error("Fetch error:", err);
+    alert("Failed to connect to the server.\n\nError: " + err.message + "\n\nCheck browser console (F12) for details.");
+  } finally {
+    // Reset button
+    button.innerHTML = originalText;
+    button.disabled = false;
+  }
+}
+
+function createCharts() {
+  // Status Chart
+  new Chart(document.getElementById('statusChart'), {
+    type: 'doughnut',
+    data: {
+      labels: ['PAS', 'NPL', 'SUB', 'DOU'],
+      datasets: [{ data: [72, 14, 9, 5], backgroundColor: ['#22c55e', '#ef4444', '#eab308', '#a855f7'] }]
+    }
+  });
+
+  // Age Chart
+  new Chart(document.getElementById('ageChart'), {
+    type: 'bar',
+    data: {
+      labels: ['0-90', '91-180', '181-365', '365+'],
+      datasets: [{ label: 'Avg Risk', data: [1.9, 3.3, 4.7, 6.8], backgroundColor: '#6366f1' }]
+    }
+  });
+}
+
+// Fetch KPIs and populate cards
+async function loadKPIs() {
+  try {
+    const res = await fetch('/api/kpis');
+    if (!res.ok) return;
+    const k = await res.json();
+    document.getElementById('k_total').textContent = k.total_loans.toLocaleString();
+    document.getElementById('k_npl').textContent = k.npl_pct + '%';
+    document.getElementById('k_var').textContent = 'ETB ' + Number(k.var_amount).toLocaleString();
+    document.getElementById('k_age').textContent = k.avg_loan_age_days + ' d';
+  } catch (err) {
+    console.warn('Failed to load KPIs', err);
+  }
+}
+
+// Load KPIs on page load
+window.addEventListener('DOMContentLoaded', () => {
+  loadKPIs();
+  loadEWS();
+  loadTemporal();
+  loadSector();
+  loadHeatmap();
+  // Initialize Lucide icons
+  lucide.createIcons();
+});
+
+async function loadEWS() {
+  try {
+    const res = await fetch('/api/ews');
+    if (!res.ok) return;
+    const { ews } = await res.json();
+    const tbody = document.querySelector('#ewsTable tbody');
+    tbody.innerHTML = '';
+    ews.forEach(r => {
+      const tr = document.createElement('tr');
+      tr.className = 'table-row border-t border-zinc-800';
+      tr.innerHTML = `<td class="py-3">${r.CONTRACT_CODE}</td><td>${r.DISTRICTNAME}</td><td>${r.ECONOMIC_SECTOR}</td><td>ETB ${r.PRINCIPAL_OS.toLocaleString()}</td><td>${(r.npl_prob*100).toFixed(1)}%</td><td><button class="px-3 py-1 bg-indigo-600 rounded text-sm" onclick="loadExplain('${r.CONTRACT_CODE}')">Explain</button></td>`;
+      tbody.appendChild(tr);
+    });
+  } catch (err) {
+    console.warn('EWS load failed', err);
+  }
+}
+
+async function loadTemporal() {
+  try {
+    const qres = await fetch('/api/temporal/quarterly');
+    const qdata = await qres.json();
+    const labels = qdata.quarterly.map(r => 'Q' + r.quarter);
+    const vals = qdata.quarterly.map(r => r.npl_rate);
+    new Chart(document.getElementById('quarterChart'), { type: 'bar', data: { labels, datasets: [{ label: 'NPL %', data: vals, backgroundColor: '#ef4444' }] } });
+
+    const vres = await fetch('/api/temporal/vintage');
+    const vdata = await vres.json();
+    const vlabels = vdata.vintage.map(r => r.grant_ym).reverse();
+    const vvals = vdata.vintage.map(r => r.npl_rate).reverse();
+    new Chart(document.getElementById('vintageChart'), { type: 'line', data: { labels: vlabels, datasets: [{ label: 'Vintage NPL %', data: vvals, borderColor: '#f59e0b', tension: 0.3 }] } });
+  } catch (err) {
+    console.warn('Temporal load failed', err);
+  }
+}
+
+async function loadSector() {
+  try {
+    const res = await fetch('/api/sector_exposure');
+    const { sectors } = await res.json();
+    const labels = sectors.map(s => s.sector);
+    const vals = sectors.map(s => s.sum_principal);
+    new Chart(document.getElementById('sectorChart'), { type: 'doughnut', data: { labels, datasets: [{ data: vals, backgroundColor: ['#60a5fa','#34d399','#f472b6','#f97316'] }] } });
+  } catch (err) {
+    console.warn('Sector load failed', err);
+  }
+}
+
+async function loadHeatmap() {
+  try {
+    const res = await fetch('/api/heatmap');
+    const { points } = await res.json();
+    const ctx = document.getElementById('heatmapCanvas');
+    const labels = points.map((p,i)=>i+1);
+    const data = points.map(p => ({ x: p.lon, y: p.lat, r: Math.max(2, p.npl_prob*20) }));
+    new Chart(ctx, { type: 'bubble', data: { datasets: [{ label: 'Risk points', data, backgroundColor: function(context){ return 'rgba(239,68,68,0.8)'; } }] }, options: { scales: { x: { display: true, title: { display: true, text: 'Longitude' } }, y: { display: true, title: { display: true, text: 'Latitude' } } } } });
+  } catch (err) {
+    console.warn('Heatmap load failed', err);
+  }
+}
+
+async function loadExplain(contract) {
+  try {
+    const res = await fetch('/api/shap/' + encodeURIComponent(contract));
+    // fall back to old endpoint if shap endpoint not present
+    let data;
+    if (res.status === 404) {
+      const fres = await fetch('/api/explain/' + encodeURIComponent(contract));
+      if (!fres.ok) { alert('No explanation available'); return; }
+      data = await fres.json();
+      const box = document.getElementById('explainBox');
+      const content = document.getElementById('explainContent');
+      content.innerHTML = '<h4 class="font-semibold mb-2">' + data.contract_code + '</h4>' + data.top_contributors.map(c => `<div class="py-1"><strong>${c.feature}</strong>: value=${(c.value||0).toFixed ? (c.value).toFixed(3) : c.value}, importance=${(c.importance||0).toFixed ? (c.importance).toFixed(3) : c.importance}</div>`).join('');
+      box.classList.remove('hidden');
+      box.scrollIntoView({ behavior: 'smooth' });
+      return;
+    }
+
+    if (!res.ok) { alert('No explanation available'); return; }
+    data = await res.json();
+    const box = document.getElementById('explainBox');
+    const content = document.getElementById('explainContent');
+    if (data.shap_available) {
+      content.innerHTML = '<h4 class="font-semibold mb-2">' + data.contract_code + ' (SHAP)</h4>' + data.top_contributors.map(c => `<div class="py-1"><strong>${c.feature}</strong>: shap=${c.shap_value.toFixed(4)}</div>`).join('');
+    } else {
+      content.innerHTML = '<h4 class="font-semibold mb-2">' + data.contract_code + '</h4>' + data.top_contributors.map(c => `<div class="py-1"><strong>${c.feature}</strong>: value=${(c.value||0).toFixed ? (c.value).toFixed(3) : c.value}, importance=${(c.importance||0).toFixed ? (c.importance).toFixed(3) : c.importance}</div>`).join('');
+    }
+    box.classList.remove('hidden');
+    box.scrollIntoView({ behavior: 'smooth' });
+  } catch (err) {
+    console.warn('Explain failed', err);
+  }
+}
+</script>
+</body>
+</html>
