@@ -97,7 +97,7 @@
             </div>
             
             <div class="flex items-end">
-                <button onclick="refreshAlerts()" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center">
+                <button onclick="refreshAlerts()" class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 flex items-center">
                     <i data-lucide="refresh-cw" class="w-4 h-4 mr-2"></i>
                     Refresh
                 </button>
@@ -442,7 +442,8 @@ function viewAlertDetails(alertId) {
     
     // Update button visibility based on status
     document.getElementById('acknowledgeBtn').style.display = alert.status === 'open' ? 'inline-block' : 'none';
-    document.getElementById('resolveBtn').style.display = ['open', 'acknowledged'].includes(alert.status) ? 'inline-block' : 'none';
+    document.getElementById('escalateBtn').style.display = ['open', 'acknowledged'].includes(alert.status) ? 'inline-block' : 'none';
+    document.getElementById('resolveBtn').style.display = ['open', 'acknowledged', 'escalated'].includes(alert.status) ? 'inline-block' : 'none';
     
     // Show modal
     document.getElementById('alertModal').classList.remove('hidden');
@@ -456,7 +457,10 @@ function closeAlertModal() {
 
 async function acknowledgeAlert(alertId = null) {
     const id = alertId || currentAlertId;
-    if (!id) return;
+    if (!id) {
+        showError('No alert selected');
+        return;
+    }
     
     try {
         const response = await fetch(`/api/alerts/${id}/acknowledge`, {
@@ -465,22 +469,28 @@ async function acknowledgeAlert(alertId = null) {
             body: JSON.stringify({ user_id: 'current_user' })
         });
         
-        if (response.ok) {
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
             closeAlertModal();
             refreshAlerts();
             showSuccess('Alert acknowledged successfully');
         } else {
-            showError('Failed to acknowledge alert');
+            console.error('Acknowledge failed:', result);
+            showError(result.error || 'Failed to acknowledge alert');
         }
     } catch (error) {
         console.error('Error acknowledging alert:', error);
-        showError('Error acknowledging alert');
+        showError('Error acknowledging alert: ' + error.message);
     }
 }
 
 async function resolveAlert(alertId = null) {
     const id = alertId || currentAlertId;
-    if (!id) return;
+    if (!id) {
+        showError('No alert selected');
+        return;
+    }
     
     const notes = prompt('Please enter resolution notes:');
     if (notes === null) return; // User cancelled
@@ -495,22 +505,28 @@ async function resolveAlert(alertId = null) {
             })
         });
         
-        if (response.ok) {
+        const result = await response.json();
+        
+        if (response.ok && result.success) {
             closeAlertModal();
             refreshAlerts();
             showSuccess('Alert resolved successfully');
         } else {
-            showError('Failed to resolve alert');
+            console.error('Resolve failed:', result);
+            showError(result.error || 'Failed to resolve alert');
         }
     } catch (error) {
         console.error('Error resolving alert:', error);
-        showError('Error resolving alert');
+        showError('Error resolving alert: ' + error.message);
     }
 }
 
 async function escalateAlert(alertId = null) {
     const id = alertId || currentAlertId;
-    if (!id) return;
+    if (!id) {
+        showError('No alert selected');
+        return;
+    }
 
     try {
         const response = await fetch(`/api/alerts/${id}/escalate`, {
@@ -519,16 +535,19 @@ async function escalateAlert(alertId = null) {
             body: JSON.stringify({ user_id: 'current_user' })
         });
 
-        if (response.ok) {
+        const result = await response.json();
+
+        if (response.ok && result.success) {
             closeAlertModal();
             refreshAlerts();
             showSuccess('Alert escalated successfully');
         } else {
-            showError('Failed to escalate alert');
+            console.error('Escalate failed:', result);
+            showError(result.error || 'Failed to escalate alert');
         }
     } catch (error) {
         console.error('Error escalating alert:', error);
-        showError('Error escalating alert');
+        showError('Error escalating alert: ' + error.message);
     }
 }
 

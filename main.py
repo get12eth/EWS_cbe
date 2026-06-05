@@ -45,11 +45,20 @@ _SHAP_EXPLAINER = None
 
 app = FastAPI(title="CBE Loan Risk Dashboard", debug=True)
 
-# Mount static files only if directory exists
+#Mount static files only if directory exists
 if os.path.exists("static"):
     app.mount("/static", StaticFiles(directory="static"), name="static")
 templates = Jinja2Templates(directory="templates")
 templates.env.cache_size = 0
+
+def get_user_role(request: Request) -> Optional[str]:
+    username = request.session.get('user')
+    if not username:
+        return None
+    info = _get_user_info(username)
+    return info.get('role') if info else None
+
+templates.env.globals['get_user_role'] = get_user_role
 
 #Password hashing context
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
@@ -87,6 +96,13 @@ def _require_roles(request: Request, allowed_roles: List[str]) -> Optional[Dict]
     return None
 
 
+def _redirect_dao_user(request: Request):
+    """Redirect DAO users to the DAO cases page if they try to access non-DAO pages."""
+    if get_user_role(request) == 'dao':
+        return RedirectResponse('/dao/cases', status_code=302)
+    return None
+
+
 #Load .env and session secret
 load_dotenv()
 SESSION_SECRET = os.environ.get('SESSION_SECRET')
@@ -95,19 +111,19 @@ if not SESSION_SECRET:
     warnings.warn('SESSION_SECRET not set; falling back to insecure default. Set SESSION_SECRET in .env')
     SESSION_SECRET = '4z_WvP9_nL6Wz5xR8qK2mJ-V1tY7bN4uX0iE3oP1aQ8'
 
-app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET)
+app.add_middleware(SessionMiddleware, secret_key=SESSION_SECRET) 
 
-# Scheduler control event for background jobs
+#Scheduler control event for background jobs
 scheduler_stop_event = threading.Event()
 
-# Interval (minutes) for SME alert population; configurable via env
+#Interval (minutes) for SME alert population; configurable via env
 SME_POPULATE_INTERVAL_MINUTES = int(os.environ.get('SME_POPULATE_INTERVAL_MINUTES', '60'))
 # Lookback hours and probability threshold for SME population (configurable via env)
 SME_POPULATE_LOOKBACK_HOURS = int(os.environ.get('SME_POPULATE_LOOKBACK_HOURS', '24'))
 SME_POPULATE_THRESHOLD = float(os.environ.get('SME_POPULATE_THRESHOLD', '0.5'))
 
-# Initialize module engines
-db_config = {
+#Initialize module engines
+db_config ={
     'host': 'localhost',
     'user': 'root',
     'password': 'Bant@6963',
@@ -147,13 +163,43 @@ async def root(request: Request):
 #4. Add Login POST Route
 @app.post('/')
 async def login_submit(request: Request, username: str = Form(...), password: str = Form(...)):
+    
     """Handle login form submission"""
-    # Simple authentication - in production, use proper password hashing
-    if username == 'admin' and password == 'admin':
-        request.session['user'] = username
-        return RedirectResponse('/dashboard', status_code=302)
-    else:
-        # Return to login page with error
+    #Prefer DB-backed authentication if users table exists
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute("SELECT username, password_hash, is_active FROM users WHERE username = %s LIMIT 1", (username,))
+        user = cursor.fetchone()
+        cursor.close()
+        conn.close()
+
+        if user and user.get('is_active'):
+            stored = user.get('password_hash')
+            # If password is hashed, verify using pwd_context; otherwise fall back to plaintext compare
+            try:
+                if stored and pwd_context.verify(password, stored):
+                    request.session['user'] = username
+                    return RedirectResponse('/dashboard', status_code=302)
+            except Exception:
+                # If verification fails (e.g., stored is plain text), compare directly
+                if stored == password:
+                    request.session['user'] = username
+                    return RedirectResponse('/dashboard', status_code=302)
+
+        # Fallback: allow local admin/admin for emergency access
+        if username == 'admin' and password == 'admin':
+            request.session['user'] = username
+            return RedirectResponse('/dashboard', status_code=302)
+
+        tpl = templates.env.get_template('login.html')
+        return HTMLResponse(tpl.render({'request': request, 'error': 'Invalid username or password'}))
+    except Exception as e:
+        # On DB errors, fall back to local admin login and log the issue
+        logger.error(f"Login DB check failed: {e}")
+        if username == 'admin' and password == 'admin':
+            request.session['user'] = username
+            return RedirectResponse('/dashboard', status_code=302)
         tpl = templates.env.get_template('login.html')
         return HTMLResponse(tpl.render({'request': request, 'error': 'Invalid username or password'}))
 
@@ -163,7 +209,6 @@ async def dashboard(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
-    
     tpl = templates.env.get_template('enhanced_dashboard.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
 
@@ -173,17 +218,21 @@ async def logout(request: Request):
     request.session.pop('user', None)
     return RedirectResponse('/', status_code=302)
 
-# 5. Handle legacy /index route - redirect to /
+#5. Handle legacy /index route - redirect to /
 @app.get('/index')
 async def index_redirect():
     return RedirectResponse('/', status_code=302)
 
-# Module Routes
+#Module Routes
 @app.get('/alerts', response_class=HTMLResponse)
 async def alerts_page(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
+
+    dao_redirect = _redirect_dao_user(request)
+    if dao_redirect:
+        return dao_redirect
     
     tpl = templates.env.get_template('alerts.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
@@ -193,6 +242,10 @@ async def cases_page(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
+
+    dao_redirect = _redirect_dao_user(request)
+    if dao_redirect:
+        return dao_redirect
     
     tpl = templates.env.get_template('cases.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
@@ -202,7 +255,6 @@ async def customers_page(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
-    
     tpl = templates.env.get_template('customers.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
 
@@ -211,6 +263,10 @@ async def predict_page(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
+
+    dao_redirect = _redirect_dao_user(request)
+    if dao_redirect:
+        return dao_redirect
     
     tpl = templates.env.get_template('predict.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
@@ -220,6 +276,10 @@ async def etl_page(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
+
+    dao_redirect = _redirect_dao_user(request)
+    if dao_redirect:
+        return dao_redirect
     
     tpl = templates.env.get_template('etl.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
@@ -229,6 +289,10 @@ async def model_governance_page(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
+
+    dao_redirect = _redirect_dao_user(request)
+    if dao_redirect:
+        return dao_redirect
     
     tpl = templates.env.get_template('model_governance.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
@@ -238,6 +302,10 @@ async def simulation_page(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
+
+    dao_redirect = _redirect_dao_user(request)
+    if dao_redirect:
+        return dao_redirect
     
     tpl = templates.env.get_template('simulation.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
@@ -248,6 +316,10 @@ async def portfolio_report(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
+
+    dao_redirect = _redirect_dao_user(request)
+    if dao_redirect:
+        return dao_redirect
     
     tpl = templates.env.get_template('portfolio.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
@@ -257,6 +329,10 @@ async def compliance_report(request: Request):
     user = request.session.get('user')
     if not user:
         return RedirectResponse(url='/', status_code=302)
+
+    dao_redirect = _redirect_dao_user(request)
+    if dao_redirect:
+        return dao_redirect
     
     tpl = templates.env.get_template('compliance.html')
     return HTMLResponse(tpl.render({'request': request, 'user': user}))
@@ -483,23 +559,30 @@ async def get_kpis():
         
         cursor = conn.cursor()
         
-        #Get actual status counts from prediction_results
+        # Use the latest prediction per customer contract to avoid duplicate rows
         cursor.execute('''
-            SELECT predicted_status, COUNT(*) as count 
-            FROM prediction_results 
-            GROUP BY predicted_status
+            SELECT p.predicted_status, COUNT(*) as count 
+            FROM prediction_results p
+            JOIN (
+                SELECT contract_code, MAX(id) AS max_id
+                FROM prediction_results
+                GROUP BY contract_code
+            ) latest
+            ON p.contract_code = latest.contract_code AND p.id = latest.max_id
+            GROUP BY p.predicted_status
         ''')
         status_counts = dict(cursor.fetchall())
+
+        # Total portfolio should reflect unique customers in the system
+        cursor.execute('SELECT COUNT(*) FROM customers')
+        total_portfolio = cursor.fetchone()[0] or 0
         
         # Calculate dashboard metrics from real data
-        total_customers = sum(status_counts.values())
+        total_customers = total_portfolio
         pas = status_counts.get('PAS', 0)
         set_count = status_counts.get('SET', 0)
         npl = status_counts.get('NPL', 0)
         sme = status_counts.get('SME', 0)
-        
-        #Total Portfolio = Total customers
-        total_portfolio = total_customers
         
         #Active Loans = customers with PAS and SET status
         active_loans = pas + set_count
@@ -534,7 +617,6 @@ async def get_kpis():
             'risk_alerts_change': 0
         }
 
-
 @app.get('/api/risk-distribution')
 async def get_risk_distribution():
     """Get risk distribution by CBE Region for NPL and SME customers from actual database"""
@@ -552,6 +634,12 @@ async def get_risk_distribution():
         cursor.execute('''
             SELECT c.CBE_REGION, p.predicted_status, COUNT(*) as count
             FROM prediction_results p
+            JOIN (
+                SELECT contract_code, MAX(id) AS max_id
+                FROM prediction_results
+                GROUP BY contract_code
+            ) latest
+            ON p.contract_code = latest.contract_code AND p.id = latest.max_id
             JOIN customers c ON p.customer_id = c.id
             WHERE p.predicted_status IN ('NPL', 'SME')
             AND c.CBE_REGION IS NOT NULL
@@ -612,19 +700,31 @@ async def get_portfolio_overview():
         
         cursor = conn.cursor()
         
-        # Get status distribution for portfolio overview
+        # Use latest contract prediction to build the portfolio overview
         cursor.execute('''
-            SELECT predicted_status, COUNT(*) as count 
-            FROM prediction_results 
-            GROUP BY predicted_status
+            SELECT p.predicted_status, COUNT(*) as count 
+            FROM prediction_results p
+            JOIN (
+                SELECT contract_code, MAX(id) AS max_id
+                FROM prediction_results
+                GROUP BY contract_code
+            ) latest
+            ON p.contract_code = latest.contract_code AND p.id = latest.max_id
+            GROUP BY p.predicted_status
             ORDER BY count DESC
         ''')
         status_data = dict(cursor.fetchall())
         
-        # Get loan amount distribution by status
+        # Get loan amount distribution by status using latest contract predictions
         cursor.execute('''
             SELECT c.CONTRACT_CODE, p.predicted_status, c.APPROVED_AMOUNT
             FROM prediction_results p
+            JOIN (
+                SELECT contract_code, MAX(id) AS max_id
+                FROM prediction_results
+                GROUP BY contract_code
+            ) latest
+            ON p.contract_code = latest.contract_code AND p.id = latest.max_id
             JOIN customers c ON p.customer_id = c.id
             WHERE c.APPROVED_AMOUNT IS NOT NULL
         ''')
@@ -873,6 +973,7 @@ async def explain_loan(contract_code: str):
 
 
 @app.post("/predict")
+
 async def predict(
     CONTRACT_CODE: str = Form(...),
     DISTRICTNAME: str = Form(...),
@@ -1063,10 +1164,10 @@ async def predict(
         #Store prediction results in prediction_results table
         cursor.execute("""
             INSERT INTO prediction_results 
-            (contract_code, prediction, npl_probability, pas_probability, sme_probability, set_probability, risk_level, prediction_date)
+            (contract_code, predicted_status, npl_probability, pas_probability, sme_probability, set_probability, risk_level, prediction_date)
             VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
             ON DUPLICATE KEY UPDATE
-            prediction = VALUES(prediction),
+            predicted_status = VALUES(predicted_status),
             npl_probability = VALUES(npl_probability),
             pas_probability = VALUES(pas_probability),
             sme_probability = VALUES(sme_probability),
@@ -1251,20 +1352,10 @@ async def create_alert_rule(rule_data: dict):
         return {'error': 'Alerts engine not available'}
     return alerts_engine.create_alert_rule(rule_data)
 
-@app.post('/api/alerts/{alert_id}/acknowledge')
-async def acknowledge_alert(alert_id: str, user_id: str = Form(...)):
-    """Acknowledge an alert"""
-    if not alerts_engine:
-        return {'error': 'Alerts engine not available'}
-    return alerts_engine.acknowledge_alert(alert_id, user_id)
+# Note: acknowledge_alert and resolve_alert endpoints are defined later in the file with proper JSON handling and auth checks
+# Lines moved to around line 1895 to use Request object and JSON parsing
 
-@app.post('/api/alerts/{alert_id}/resolve')
-async def resolve_alert(alert_id: str, user_id: str = Form(...), resolution_notes: str = Form(...)):
-    """Resolve an alert"""
-    if not alerts_engine:
-        return {'error': 'Alerts engine not available'}
-    return alerts_engine.resolve_alert(alert_id, user_id, resolution_notes)
-
+# Alert escalation check endpoint
 @app.get('/api/alerts/check-escalations')
 async def check_alert_escalations():
     """Check for alerts that need escalation"""
@@ -1872,9 +1963,13 @@ async def acknowledge_alert(alert_id: str, request: Request):
         session_user = request.session.get('user')
         user_id = session_user or data.get('user_id', 'current_user')
 
-        # Authorization: allow only specific roles to acknowledge
-        allowed = _require_roles(request, ['admin', 'risk_officer', 'branch_manager', 'recovery_officer'])
-        if not allowed and user_id != 'system':
+        # Authorization: allow authenticated users or admin fallback
+        if not session_user:
+            return {'success': False, 'error': 'Forbidden: user not authenticated'}
+        
+        # Allow admin user (fallback) or users with proper role
+        allowed = (session_user == 'admin') or _require_roles(request, ['admin', 'risk_officer', 'branch_manager', 'recovery_officer'])
+        if not allowed:
             return {'success': False, 'error': 'Forbidden: insufficient privileges'}
 
         if alerts_engine:
@@ -1895,8 +1990,13 @@ async def resolve_alert(alert_id: str, request: Request):
         user_id = session_user or data.get('user_id', 'current_user')
         resolution_notes = data.get('resolution_notes', '')
 
-        allowed = _require_roles(request, ['admin', 'risk_officer', 'branch_manager', 'recovery_officer'])
-        if not allowed and user_id != 'system':
+        # Authorization: allow authenticated users or admin fallback
+        if not session_user:
+            return {'success': False, 'error': 'Forbidden: user not authenticated'}
+        
+        # Allow admin user (fallback) or users with proper role
+        allowed = (session_user == 'admin') or _require_roles(request, ['admin', 'risk_officer', 'branch_manager', 'recovery_officer'])
+        if not allowed:
             return {'success': False, 'error': 'Forbidden: insufficient privileges'}
 
         if alerts_engine:
@@ -1930,8 +2030,13 @@ async def escalate_alert_api(alert_id: str, request: Request):
         session_user = request.session.get('user')
         user_id = session_user or data.get('user_id', 'current_user')
 
-        allowed = _require_roles(request, ['admin', 'risk_officer', 'branch_manager'])
-        if not allowed and user_id != 'system':
+        # Authorization: allow authenticated users or admin fallback
+        if not session_user:
+            return {'success': False, 'error': 'Forbidden: user not authenticated'}
+        
+        # Allow admin user (fallback) or users with proper role
+        allowed = (session_user == 'admin') or _require_roles(request, ['admin', 'risk_officer', 'branch_manager'])
+        if not allowed:
             return {'success': False, 'error': 'Forbidden: insufficient privileges'}
 
         if alerts_engine:
@@ -1941,6 +2046,80 @@ async def escalate_alert_api(alert_id: str, request: Request):
             return {'success': False, 'error': 'Alerts engine not initialized'}
     except Exception as e:
         logger.error(f"Failed to escalate alert: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@app.get('/dao/cases')
+async def dao_cases_page(request: Request):
+    """Render DAO Cases Management dashboard. Accessible to users with role 'dao' only."""
+    session_user = request.session.get('user')
+    if not session_user:
+        return RedirectResponse('/', status_code=302)
+
+    user_info = _require_roles(request, ['dao'])
+    if not user_info:
+        return HTMLResponse('Forbidden', status_code=403)
+
+    tpl = templates.env.get_template('dao_cases.html')
+    return HTMLResponse(tpl.render({'request': request, 'user': session_user}))
+
+
+@app.get('/api/dao/cases')
+async def api_dao_cases(request: Request):
+    """Return cases for DAO to manage (escalated/open/in_progress)."""
+    user_info = _require_roles(request, ['dao'])
+    if not user_info:
+        return {'success': False, 'error': 'Forbidden'}
+
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT case_id, contract_code, case_type, priority, status, assigned_to, assigned_at, due_date, created_at, resolution_notes
+            FROM cases
+            WHERE status IN ('escalated','open','in_progress')
+            ORDER BY created_at DESC
+            LIMIT 1000
+            """
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return {'success': True, 'cases': rows}
+    except Exception as e:
+        logger.error(f"Failed to fetch DAO cases: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@app.post('/api/dao/cases/{case_id}/update')
+async def api_dao_update_case(case_id: str, request: Request):
+    """Update case status or assignment (DAO only). Expects JSON {status, assigned_to} """
+    user_info = _require_roles(request, ['dao'])
+    if not user_info:
+        return {'success': False, 'error': 'Forbidden'}
+
+    try:
+        data = await request.json()
+        status = data.get('status')
+        assigned_to = data.get('assigned_to')
+
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE cases
+            SET status = %s, assigned_to = %s, assigned_at = NOW(), updated_at = NOW()
+            WHERE case_id = %s
+            """,
+            (status, assigned_to, case_id)
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return {'success': True}
+    except Exception as e:
+        logger.error(f"Failed to update case {case_id}: {e}")
         return {'success': False, 'error': str(e)}
 
 

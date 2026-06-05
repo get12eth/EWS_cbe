@@ -23,11 +23,11 @@ DROP TABLE IF EXISTS simulation_scenarios;
 DROP TABLE IF EXISTS users;
 DROP TABLE IF EXISTS system_config;
 DROP TABLE IF EXISTS activity_logs;
+DROP TABLE IF EXISTS ews_admins;
 DROP TABLE IF EXISTS loan_table;
 DROP TABLE IF EXISTS macro_indicators;
 DROP TABLE IF EXISTS model_evaluations;
 DROP TABLE IF EXISTS predictions;
-DROP TABLE IF EXISTS ews_admins;
 DROP TABLE IF EXISTS customers;
 
 SET FOREIGN_KEY_CHECKS = @OLD_FOREIGN_KEY_CHECKS;
@@ -451,26 +451,92 @@ CREATE TABLE IF NOT EXISTS system_config (
 );
 
 -- Indexes for performance
-ALTER TABLE customers DROP INDEX idx_customers_contract_code;
-ALTER TABLE customers DROP INDEX idx_customers_branch;
-ALTER TABLE customers DROP INDEX idx_customers_business_date;
-ALTER TABLE alerts DROP INDEX idx_alerts_contract_code;
-ALTER TABLE alerts DROP INDEX idx_alerts_status;
-ALTER TABLE cases DROP INDEX idx_cases_contract_code;
-ALTER TABLE cases DROP INDEX idx_cases_assigned_to;
-ALTER TABLE cases DROP INDEX idx_cases_status;
-CREATE INDEX idx_customers_contract_code ON customers(CONTRACT_CODE);
-CREATE INDEX idx_customers_branch ON customers(BRANCHNAME);
-CREATE INDEX idx_customers_business_date ON customers(BUSINESS_DATE);
-CREATE INDEX idx_alerts_contract_code ON alerts(CONTRACT_CODE);
-CREATE INDEX idx_alerts_status ON alerts(status);
-CREATE INDEX idx_cases_contract_code ON cases(CONTRACT_CODE);
-CREATE INDEX idx_cases_assigned_to ON cases(assigned_to);
-CREATE INDEX idx_cases_status ON cases(status);
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'customers'
+                  AND index_name = 'idx_customers_contract_code');
+SET @sql = IF(@exists = 0,
+              'CREATE INDEX idx_customers_contract_code ON customers(CONTRACT_CODE)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
--- Insert default admin user (password: admin123)
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'customers'
+                  AND index_name = 'idx_customers_branch');
+SET @sql = IF(@exists = 0,
+              'CREATE INDEX idx_customers_branch ON customers(BRANCHNAME)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'customers'
+                  AND index_name = 'idx_customers_business_date');
+SET @sql = IF(@exists = 0,
+              'CREATE INDEX idx_customers_business_date ON customers(BUSINESS_DATE)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'alerts'
+                  AND index_name = 'idx_alerts_contract_code');
+SET @sql = IF(@exists = 0,
+              'CREATE INDEX idx_alerts_contract_code ON alerts(CONTRACT_CODE)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'alerts'
+                  AND index_name = 'idx_alerts_status');
+SET @sql = IF(@exists = 0,
+              'CREATE INDEX idx_alerts_status ON alerts(status)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'cases'
+                  AND index_name = 'idx_cases_contract_code');
+SET @sql = IF(@exists = 0,
+              'CREATE INDEX idx_cases_contract_code ON cases(CONTRACT_CODE)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'cases'
+                  AND index_name = 'idx_cases_assigned_to');
+SET @sql = IF(@exists = 0,
+              'CREATE INDEX idx_cases_assigned_to ON cases(assigned_to)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @exists = (SELECT COUNT(*) FROM information_schema.statistics
+                WHERE table_schema = DATABASE() AND table_name = 'cases'
+                  AND index_name = 'idx_cases_status');
+SET @sql = IF(@exists = 0,
+              'CREATE INDEX idx_cases_status ON cases(status)',
+              'SELECT 1');
+PREPARE stmt FROM @sql;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+-- Insert default admin, DAO, and risk officer users
 INSERT INTO users (username, password_hash, email, full_name, role) 
-VALUES ('admin', '$pbkdf2-sha256$29000$855TKsXYu/c.h1AKAWDs/Q$hcgwnfCuojqSUOkDo1Xr/5IM4mTYAEYB4ZkL.uzk1ks', 'admin@cbe.com.et', 'System Administrator', 'admin')
+VALUES
+('admin', '$pbkdf2-sha256$29000$855TKsXYu/c.h1AKAWDs/Q$hcgwnfCuojqSUOkDo1Xr/5IM4mTYAEYB4ZkL.uzk1ks', 'admin@cbe.com.et', 'System Administrator', 'admin'),
+('dao', '$pbkdf2-sha256$29000$5by3NqYUYixFKAUgBOBcKw$/o2N63L7GHrmLcEWhdOgwuu7jK8kQYm5iBRpsltzP1k', 'dao@cbe.com.et', 'District Administrator Officer', 'dao'),
+('risk_officer', '$pbkdf2-sha256$29000$GWNMKeX8/z/nfC9FiHFOCQ$Mx97l6uufK1mymeb5tGkVhZtAcxrCEMXh/6u/GkdWEg', 'riskofficer@cbe.com.et', 'Risk Officer', 'risk_officer')
 ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash);
 
 -- Insert default system configuration

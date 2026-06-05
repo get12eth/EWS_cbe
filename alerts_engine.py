@@ -263,42 +263,84 @@ class AlertsEngine:
             return f"Alert triggered for loan {customer_data.get('CONTRACT_CODE')}"
     
     def create_alert(self, alert_data: Dict) -> Dict:
-        """Create and store an alert"""
+        """Create or update an alert (upsert pattern)
+        
+        If an alert already exists for this contract_code and rule_id (in open/acknowledged status),
+        update it with new values. Otherwise, create a new alert.
+        """
         conn = self.get_connection()
-        cursor = conn.cursor()
+        cursor = conn.cursor(dictionary=True)
         
         try:
-            sql = """
-                INSERT INTO alerts 
-                (entity_id, risk_signal, severity, prediction_score, status, 
-                 contract_code, customer_name, alert_timestamp)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-            """
+            contract_code = alert_data.get('contract_code', '')
+            rule_id = alert_data.get('rule_id', None)
             
-            cursor.execute(sql, (
-                alert_data.get('contract_code', ''),
-                alert_data.get('risk_signal', alert_data.get('title', 'Unknown')),
-                alert_data['severity'],
-                alert_data.get('current_value', 0.0),
-                'open',
-                alert_data['contract_code'],
-                alert_data.get('customer_name', 'Unknown'),
-                datetime.now()
-            ))
+            # Check if alert already exists for this contract and rule (in active status)
+            existing_alert = None
+            if contract_code and rule_id:
+                cursor.execute("""
+                    SELECT alert_id, id FROM alerts 
+                    WHERE contract_code = %s AND rule_id = %s AND status IN ('open', 'acknowledged')
+                    LIMIT 1
+                """, (contract_code, rule_id))
+                existing_alert = cursor.fetchone()
             
-            conn.commit()
+            if existing_alert:
+                # UPDATE existing alert
+                uid = existing_alert['alert_id']
+                cursor.execute("""
+                    UPDATE alerts 
+                    SET severity = %s, title = %s, description = %s, 
+                        current_value = %s, threshold_value = %s, 
+                        branch_name = %s, created_at = NOW()
+                    WHERE alert_id = %s
+                """, (
+                    alert_data.get('severity', 'medium'),
+                    alert_data.get('title', alert_data.get('risk_signal', 'Alert')),
+                    alert_data.get('description', ''),
+                    alert_data.get('current_value', 0.0),
+                    alert_data.get('threshold_value', None),
+                    alert_data.get('branch_name', None),
+                    uid
+                ))
+                conn.commit()
+                logger.info(f"Updated existing alert: {uid} for contract {contract_code}")
+                action = 'updated'
+            else:
+                # INSERT new alert
+                uid = alert_data.get('alert_id') or str(uuid.uuid4())
+                
+                sql = """
+                    INSERT INTO alerts 
+                    (alert_id, rule_id, contract_code, branch_name, severity, title, description, current_value, threshold_value, status, created_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """
+                
+                cursor.execute(sql, (
+                    uid,
+                    rule_id,
+                    contract_code,
+                    alert_data.get('branch_name', None),
+                    alert_data.get('severity', 'medium'),
+                    alert_data.get('title', alert_data.get('risk_signal', 'Alert')),
+                    alert_data.get('description', ''),
+                    alert_data.get('current_value', 0.0),
+                    alert_data.get('threshold_value', None),
+                    'open',
+                    datetime.now()
+                ))
+                
+                conn.commit()
+                logger.info(f"Created new alert: {uid} for contract {contract_code}")
+                action = 'created'
             
-            # Get the ID of the inserted alert
-            alert_id = cursor.lastrowid
+            # Send notifications using the varchar alert id
+            self._send_notifications(uid, alert_data)
             
-            # Send notifications
-            self._send_notifications(str(alert_id), alert_data)
-            
-            logger.info(f"Created alert: {alert_id}")
-            return {'success': True, 'alert_id': str(alert_id)}
+            return {'success': True, 'alert_id': uid, 'action': action}
             
         except Exception as e:
-            logger.error(f"Failed to create alert: {e}")
+            logger.error(f"Failed to create/update alert: {e}")
             conn.rollback()
             return {'success': False, 'error': str(e)}
         finally:
@@ -555,9 +597,9 @@ class AlertsEngine:
                             # Avoid duplicate open alerts for same contract and rule
                             chk = conn.cursor()
                             try:
-                                # Alerts table doesn't store rule_id in this schema — check by risk_signal/title to avoid duplicates
+                                # Alerts table doesn't store rule_id in this schema — check by title to avoid duplicates
                                 title = f"{rule['rule_name']} - {p.get('CONTRACT_CODE') or p.get('contract_code')}"
-                                chk.execute("SELECT id FROM alerts WHERE contract_code = %s AND risk_signal = %s AND status IN ('open','acknowledged') LIMIT 1", (p.get('CONTRACT_CODE') or p.get('contract_code'), title))
+                                chk.execute("SELECT id FROM alerts WHERE contract_code = %s AND title = %s AND status IN ('open','acknowledged') LIMIT 1", (p.get('CONTRACT_CODE') or p.get('contract_code'), title))
                                 exists = chk.fetchone()
                             finally:
                                 chk.close()
@@ -656,16 +698,12 @@ class AlertsEngine:
                     # Avoid duplicates: same contract with open/acknowledged SME alert
                     chk = conn.cursor()
                     try:
-                        # Use risk_signal/title match to detect duplicates since rule_id column not present
+                        # Use `title` match to detect duplicates since rule_id column may not be populated
                         title = f"SME Prediction Alert - {contract_code}"
-                        chk.execute("SELECT id FROM alerts WHERE contract_code = %s AND risk_signal = %s AND status IN ('open','acknowledged') LIMIT 1", (contract_code, title))
+                        chk.execute("SELECT id, alert_id FROM alerts WHERE contract_code = %s AND title = %s AND status IN ('open','acknowledged') LIMIT 1", (contract_code, title))
                         exists = chk.fetchone()
                     finally:
                         chk.close()
-
-                    if exists:
-                        skipped += 1
-                        continue
 
                     # Build alert payload
                     alert_payload = {
@@ -681,11 +719,32 @@ class AlertsEngine:
                         'recipients': [{'role': 'branch_manager'}]
                     }
 
-                    res = self.create_alert(alert_payload)
-                    if res.get('success'):
-                        created += 1
+                    if exists:
+                        # UPDATE existing alert with new prediction data
+                        alert_id = exists.get('alert_id')
+                        upd = conn.cursor()
+                        try:
+                            upd.execute("""
+                                UPDATE alerts 
+                                SET description = %s, current_value = %s, created_at = NOW()
+                                WHERE alert_id = %s
+                            """, (
+                                alert_payload['description'],
+                                sme_prob,
+                                alert_id
+                            ))
+                            conn.commit()
+                            logger.info(f"Updated SME alert {alert_id} for contract {contract_code}: SME prob={sme_prob:.4f}")
+                            created += 1
+                        finally:
+                            upd.close()
                     else:
-                        errors.append(res.get('error', 'unknown'))
+                        # CREATE new alert
+                        res = self.create_alert(alert_payload)
+                        if res.get('success'):
+                            created += 1
+                        else:
+                            errors.append(res.get('error', 'unknown'))
 
                 except Exception as e:
                     errors.append(str(e))
@@ -774,7 +833,7 @@ class AlertsEngine:
             try:
                 cursor.execute("""
                     SELECT 
-                        id, contract_code, branch_name, severity, title,
+                        id, alert_id, contract_code, branch_name, severity, title,
                         description, current_value, threshold_value, status,
                         created_at, due_date, escalated_at
                     FROM alerts 
@@ -908,7 +967,7 @@ class AlertsEngine:
             cursor.execute("""
                 UPDATE alerts 
                 SET status = 'acknowledged', acknowledged_at = NOW(), acknowledged_by = %s
-                WHERE id = %s AND status = 'open'
+                WHERE alert_id = %s AND status = 'open'
             """, (user_id, alert_id))
             
             conn.commit()
@@ -934,7 +993,7 @@ class AlertsEngine:
             cursor.execute("""
                 UPDATE alerts 
                 SET status = 'resolved', resolved_at = NOW(), resolution_notes = %s
-                WHERE id = %s AND status IN ('open', 'acknowledged', 'escalated')
+                WHERE alert_id = %s AND status IN ('open', 'acknowledged', 'escalated')
             """, (resolution_notes, alert_id))
             
             conn.commit()
@@ -957,7 +1016,7 @@ class AlertsEngine:
         cursor = conn.cursor(dictionary=True)
 
         try:
-            cursor.execute("SELECT * FROM alerts WHERE id = %s LIMIT 1", (alert_id,))
+            cursor.execute("SELECT * FROM alerts WHERE alert_id = %s LIMIT 1", (alert_id,))
             alert = cursor.fetchone()
             if not alert:
                 return {'success': False, 'error': 'Alert not found'}
@@ -966,17 +1025,78 @@ class AlertsEngine:
             if escalated_by:
                 try:
                     upd = conn.cursor()
-                    upd.execute("UPDATE alerts SET escalated_by = %s WHERE id = %s", (escalated_by, alert_id))
+                    upd.execute("UPDATE alerts SET escalated_by = %s WHERE alert_id = %s", (escalated_by, alert_id))
                     upd.close()
                 except Exception:
                     pass
 
             # Call internal escalation handler
             self._escalate_alert(alert)
+
+            # Ensure DAO case exists for escalated alert
+            self._ensure_dao_case(alert)
             return {'success': True}
         except Exception as e:
             logger.error(f"Failed to escalate alert {alert_id}: {e}")
             return {'success': False, 'error': str(e)}
+        finally:
+            cursor.close()
+
+    def _ensure_dao_case(self, alert: Dict):
+        """Create a DAO case from an escalated alert if no open case exists."""
+        if not alert.get('contract_code'):
+            return
+
+        conn = self.get_connection()
+        cursor = conn.cursor(dictionary=True)
+        try:
+            cursor.execute(
+                """
+                SELECT case_id FROM cases
+                WHERE contract_code = %s
+                AND status IN ('open', 'in_progress')
+                LIMIT 1
+                """,
+                (alert['contract_code'],)
+            )
+            existing_case = cursor.fetchone()
+            if existing_case:
+                return
+
+            # Create a new DAO case for the escalated alert
+            case_id = f"CASE_{datetime.now().strftime('%Y%m%d_%H%M%S')}_{str(uuid.uuid4())[:8]}"
+            priority = 'high' if alert.get('severity') in ('high', 'critical') else 'medium'
+            due_date = datetime.now() + timedelta(days=14 if priority == 'high' else 30)
+
+            insert_sql = """
+                INSERT INTO cases (
+                    case_id, contract_code, case_type, priority, status,
+                    assigned_to, assigned_by, assigned_at, due_date,
+                    expected_resolution, risk_score, total_exposure, days_past_due,
+                    last_payment_date
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            cursor.execute(insert_sql, (
+                case_id,
+                alert['contract_code'],
+                'recovery',
+                priority,
+                'open',
+                'dao',
+                alert.get('escalated_by') or 'system',
+                datetime.now(),
+                due_date,
+                None,
+                alert.get('current_value', 0),
+                alert.get('threshold_value', 0),
+                None,
+                None
+            ))
+            conn.commit()
+            logger.info(f"Created DAO case {case_id} for escalated alert {alert.get('alert_id')}")
+        except Exception as e:
+            logger.error(f"Failed to create DAO case for alert {alert.get('alert_id')}: {e}")
+            conn.rollback()
         finally:
             cursor.close()
 

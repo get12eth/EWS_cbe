@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% set title = "DAO Cases Management" %}
+{% set page_title = "DAO Cases Management" %}
+{% set page_description = "Manage escalated cases from the Alerts module" %}
+{% set active_page = "dao_cases" %}
+
+{% block content %}
+<div class="space-y-6">
+    <div class="bg-white rounded-lg shadow p-6">
+        <h2 class="text-xl font-semibold mb-4">Escalated Cases</h2>
+        <div id="casesContainer">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead>
+                    <tr>
+                        <th>Case ID</th>
+                        <th>Contract</th>
+                        <th>Type</th>
+                        <th>Priority</th>
+                        <th>Status</th>
+                        <th>Assigned To</th>
+                        <th>Created</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="casesTableBody">
+                    <tr><td colspan="8">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+async function loadDaoCases(){
+    try{
+        const resp = await fetch('/api/dao/cases');
+        const data = await resp.json();
+        if(!data.success){
+            showError(data.error || 'Failed to load cases');
+            return;
+        }
+        const tbody = document.getElementById('casesTableBody');
+        const cases = data.cases || [];
+        if(cases.length === 0){
+            tbody.innerHTML = '<tr><td colspan="8" class="text-center">No escalated cases</td></tr>';
+            return;
+        }
+        tbody.innerHTML = cases.map(c => `
+            <tr class="hover:bg-gray-50">
+                <td class="px-2 py-1">${c.case_id}</td>
+                <td class="px-2 py-1">${c.contract_code}</td>
+                <td class="px-2 py-1">${c.case_type}</td>
+                <td class="px-2 py-1">${c.priority}</td>
+                <td class="px-2 py-1">${c.status}</td>
+                <td class="px-2 py-1">${c.assigned_to || '-'}</td>
+                <td class="px-2 py-1">${new Date(c.created_at).toLocaleString()}</td>
+                <td class="px-2 py-1">
+                    <button onclick="openAssignModal('${c.case_id}')" class="px-2 py-1 bg-blue-600 text-white rounded">Assign</button>
+                    <button onclick="openUpdateStatus('${c.case_id}')" class="px-2 py-1 bg-green-600 text-white rounded ml-2">Update</button>
+                </td>
+            </tr>
+        `).join('');
+    }catch(e){
+        console.error('Failed loading DAO cases', e);
+        showError('Failed to load cases');
+    }
+}
+
+function openAssignModal(caseId){
+    const assignee = prompt('Enter assignee user id or name:');
+    if(assignee === null) return;
+    updateCase(caseId, {assigned_to: assignee});
+}
+
+function openUpdateStatus(caseId){
+    const status = prompt('Enter new status (open, in_progress, resolved, closed):');
+    if(status === null) return;
+    updateCase(caseId, {status: status});
+}
+
+async function updateCase(caseId, payload){
+    try{
+        const resp = await fetch(`/api/dao/cases/${caseId}/update`, {
+            method: 'POST',
+            headers: {'Content-Type':'application/json'},
+            body: JSON.stringify(payload)
+        });
+        const result = await resp.json();
+        if(result.success){
+            showSuccess('Case updated');
+            loadDaoCases();
+        } else {
+            showError(result.error || 'Failed to update case');
+        }
+    }catch(e){
+        console.error('Case update error', e);
+        showError('Failed to update case');
+    }
+}
+
+function showSuccess(message){
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-green-500 text-white px-4 py-2 rounded-md shadow-lg z-50';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+}
+
+function showError(message){
+    const notification = document.createElement('div');
+    notification.className = 'fixed top-4 right-4 bg-red-500 text-white px-4 py-2 rounded-md shadow-lg z-50';
+    notification.textContent = message;
+    document.body.appendChild(notification);
+    setTimeout(() => notification.remove(), 3000);
+}
+
+// Load on page ready
+document.addEventListener('DOMContentLoaded', () => {
+    loadDaoCases();
+});
+</script>
+
+{% endblock %}

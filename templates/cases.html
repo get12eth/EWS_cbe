@@ -10,7 +10,7 @@
     <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-semibold">Active Cases</h3>
         <div>
-            <button id="refreshCases" class="px-3 py-2 bg-blue-600 text-white rounded-md">Refresh</button>
+            <button id="refreshCases" class="px-3 py-2 bg-purple600 text-white rounded-md">Refresh</button>
         </div>
     </div>
 
@@ -210,7 +210,7 @@ async function viewExplanation(contractCode){
             type: 'bar',
             data: {
                 labels: labels,
-                datasets: [{ label: 'Absolute SHAP', data: values, backgroundColor: 'rgba(59,130,246,0.7)' }]
+                datasets: [{ label: 'Absolute SHAP', data: values, backgroundColor: 'rgba(124,58,237,0.7)' }]
             },
             options: { indexAxis: 'y', scales: { x: { beginAtZero: true } } }
         });

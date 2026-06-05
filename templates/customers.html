@@ -5,16 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Customer Management - CBE Loan Risk Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/static/dashboard.css">
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         .sidebar-item { transition: all 0.3s ease; }
-        .sidebar-item:hover { background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; }
-        .sidebar-item.active { background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; }
+        .sidebar-item:hover { background-color: rgba(124, 58, 237, 0.12); border-left: 4px solid #7c3aed; }
+        .sidebar-item.active { background-color: rgba(124, 58, 237, 0.12); border-left: 4px solid #7c3aed; }
         .action-btn { transition: all 0.2s ease; }
         .action-btn:hover { transform: scale(1.05); }
     </style>
 </head>
-<body class="bg-gray-50">
+<body>
     <div class="flex h-screen">
         <div class="w-64 bg-white shadow-lg">
             <div class="p-4 border-b">
@@ -44,10 +45,18 @@
                                 <i data-lucide="users" class="w-5 h-5"></i>
                                 <span>Customers</span>
                             </a>
+                            {% if get_user_role(request) == 'dao' %}
+                            <a href="/dao/cases" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                                <i data-lucide="shield-check" class="w-5 h-5"></i>
+                                <span>DAO Cases</span>
+                            </a>
+                            {% endif %}
+                            {% if get_user_role(request) != 'dao' %}
                             <a href="/predict" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
                                 <i data-lucide="trending-up" class="w-5 h-5"></i>
                                 <span>Predict Risk</span>
                             </a>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -78,7 +87,7 @@
                             <input type="text" id="searchInput" placeholder="Search customers..." 
                                    class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
                                                         <button onclick="openAddCustomerModal()" 
-                                    class="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors">
+                                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
                                 <i data-lucide="plus" class="w-5 h-5 inline mr-2"></i>
                                 Add Customer
                             </button>
