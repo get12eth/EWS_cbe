@@ -4,7 +4,7 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+  background: #f9fafb;
   min-height: 100vh;
   overflow-x: hidden;
 }
