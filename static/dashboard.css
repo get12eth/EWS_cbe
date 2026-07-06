@@ -4,26 +4,27 @@
 
 body {
   font-family: 'Inter', sans-serif;
-  background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+  background: #f9fafb !important;
   min-height: 100vh;
   overflow-x: hidden;
 }
 
 .dashboard-header {
-  background: rgba(30, 41, 59, 0.95);
+  background: rgba(255, 255, 255, 0.95);
   backdrop-filter: blur(10px);
-  border-bottom: 1px solid rgba(75, 85, 99, 0.3);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
   position: sticky;
   top: 0;
   z-index: 50;
 }
 
 .kpi-card {
-  background: linear-gradient(145deg, rgba(30, 41, 59, 0.9), rgba(51, 65, 85, 0.8));
-  border: 1px solid rgba(75, 85, 99, 0.3);
+  background: linear-gradient(145deg, #ffffff, #f8fafc);
+  border: 1px solid rgba(0, 0, 0, 0.06);
   transition: all 0.3s ease;
   position: relative;
   overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
 }
 
 .kpi-card::before {
@@ -43,28 +44,29 @@ body {
 
 .kpi-card:hover {
   transform: translateY(-5px);
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
 }
 
 .form-section {
-  background: rgba(30, 41, 59, 0.8);
-  border: 1px solid rgba(75, 85, 99, 0.3);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 1rem;
   padding: 2rem;
   margin-bottom: 2rem;
-  backdrop-filter: blur(5px);
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
 .chart-container {
-  background: rgba(30, 41, 59, 0.9);
-  border: 1px solid rgba(75, 85, 99, 0.3);
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 1rem;
   padding: 2rem;
   transition: all 0.3s ease;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
 }
 
 .chart-container:hover {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
 .btn-primary {
@@ -95,8 +97,8 @@ body {
 }
 
 .result-card {
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(5, 150, 105, 0.1));
-  border: 1px solid rgba(16, 185, 129, 0.3);
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.05), rgba(5, 150, 105, 0.05));
+  border: 1px solid rgba(16, 185, 129, 0.2);
   animation: fadeInUp 0.6s ease-out;
 }
 
@@ -116,7 +118,7 @@ body {
 }
 
 .table-row:hover {
-  background: rgba(75, 85, 99, 0.2);
+  background: rgba(0, 0, 0, 0.02);
   transform: scale(1.01);
 }
 

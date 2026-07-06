@@ -10,7 +10,7 @@
     <div class="flex items-center justify-between mb-4">
         <h3 class="text-lg font-semibold">Active Cases</h3>
         <div>
-            <button id="refreshCases" class="px-3 py-2 bg-purple600 text-white rounded-md">Refresh</button>
+            <button id="refreshCases" class="px-3 py-2 bg-purple-600 text-white rounded-md">Refresh</button>
         </div>
     </div>
 
@@ -35,7 +35,7 @@
 </div>
 
 <!-- Remediation Modal -->
-<div id="remediateModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+<div id="remediateModal" class="hidden fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
     <div class="bg-white rounded-lg shadow p-6 w-full max-w-lg">
         <div class="flex items-center justify-between mb-4">
             <h4 class="text-lg font-medium">Log Remediation Action</h4>
@@ -73,7 +73,7 @@
 </div>
 
 <!-- SHAP Explanation Modal -->
-<div id="explainModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 flex items-center justify-center z-50">
+<div id="explainModal" class="hidden fixed inset-0 bg-white/80 backdrop-blur-sm flex items-center justify-center z-50">
     <div class="bg-white rounded-lg shadow p-6 w-full max-w-2xl">
         <div class="flex items-center justify-between mb-4">
             <h4 class="text-lg font-medium">SHAP Explanation</h4>
@@ -172,12 +172,11 @@ async function submitRemediation() {
         alert('Error submitting remediation');
     }
 
-    return false; // prevent normal form submit
+    return false;
 }
 
 function closeExplainModal(){
     document.getElementById('explainModal').classList.add('hidden');
-    // destroy chart if exists
     if(window._explainChart){ window._explainChart.destroy(); window._explainChart = null; }
 }
 
@@ -200,7 +199,6 @@ async function viewExplanation(contractCode){
         const list = data.top_features || data.top_contributors || [];
         document.getElementById('explainList').innerHTML = '<ul class="list-disc pl-6">' + list.map(f=>`<li>${f.feature}: value=${f.feature_value ?? f.value ?? ''} shap=${(f.shap_value ?? f.value ?? 0).toFixed(4)}</li>`).join('') + '</ul>';
 
-        // render bar chart of top features
         const labels = list.map(f=>f.feature).slice(0,10);
         const values = list.map(f=>Math.abs(f.shap_value ?? f.value ?? 0)).slice(0,10);
 

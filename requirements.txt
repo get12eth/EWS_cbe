@@ -9,3 +9,5 @@ mysql-connector-python
 passlib[bcrypt]
 python-dotenv
 itsdangerous
+xgboost
+category_encoders
