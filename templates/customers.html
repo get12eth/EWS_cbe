@@ -1,106 +1,20 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Customer Management - CBE Loan Risk Management</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/static/dashboard.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .sidebar-item { transition: all 0.3s ease; }
-        .sidebar-item:hover { background-color: rgba(124, 58, 237, 0.12); border-left: 4px solid #7c3aed; }
-        .sidebar-item.active { background-color: rgba(124, 58, 237, 0.12); border-left: 4px solid #7c3aed; }
-        .action-btn { transition: all 0.2s ease; }
-        .action-btn:hover { transform: scale(1.05); }
-    </style>
-</head>
-<body>
-    <div class="flex h-screen">
-        <div class="w-64 bg-white shadow-lg">
-            <div class="p-4 border-b">
-                <div class="flex items-center space-x-3">
-                    <img src="/static/image/cbe_l.jpg" alt="CBE Logo" class="w-10 h-10 rounded-lg object-cover">
-                    <div>
-                        <h1 class="text-lg font-bold text-gray-900">CBE EWS</h1>
-                        <p class="text-xs text-gray-500">Loan Management System</p>
-                    </div>
-                </div>
-            </div>
-            
-            <nav class="p-4">
-                <div class="space-y-6">
-                    <div>
-                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Main</h3>
-                        <a href="/dashboard" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
-                            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                            <span>Dashboard</span>
-                        </a>
-                    </div>
-                    
-                    <div>
-                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Risk Management</h3>
-                        <div class="space-y-1">
-                            <a href="/customers" class="sidebar-item flex items-center space-x-3 text-blue-600 p-2 rounded-lg bg-blue-50">
-                                <i data-lucide="users" class="w-5 h-5"></i>
-                                <span>Customers</span>
-                            </a>
-                            {% if get_user_role(request) == 'dao' %}
-                            <a href="/dao/cases" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
-                                <i data-lucide="shield-check" class="w-5 h-5"></i>
-                                <span>DAO Cases</span>
-                            </a>
-                            {% endif %}
-                            {% if get_user_role(request) != 'dao' %}
-                            <a href="/predict" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
-                                <i data-lucide="trending-up" class="w-5 h-5"></i>
-                                <span>Predict Risk</span>
-                            </a>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </nav>
-            
-            <div class="absolute bottom-0 left-0 right-0 p-4 border-t">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                        <i data-lucide="user" class="w-4 h-4 text-gray-600"></i>
-                    </div>
-                    <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-900">{{ user }}</p>
-                        <p class="text-xs text-gray-500">Administrator</p>
-                    </div>
-                </div>
-            </div>
+{% extends "base.html" %}
+
+{% set title = "Customer Management" %}
+{% set page_title = "Customer Management" %}
+{% set page_description = "Manage customers and predict loan risks" %}
+{% set active_page = "customers" %}
+
+{% block content %}
+        <div class="mb-4 flex items-center space-x-4">
+            <input type="text" id="searchInput" placeholder="Search customers..." 
+                   class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <button onclick="openAddCustomerModal()" 
+                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
+                <i data-lucide="plus" class="w-5 h-5 inline mr-2"></i>
+                Add Customer
+            </button>
         </div>
-        
-        <div class="flex-1 overflow-auto">
-            <header class="bg-white shadow-sm border-b">
-                <div class="px-6 py-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-900">Customer Management</h2>
-                            <p class="text-gray-500">Manage customers and predict loan risks</p>
-                        </div>
-                        <div class="flex items-center space-x-4">
-                            <input type="text" id="searchInput" placeholder="Search customers..." 
-                                   class="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500">
-                                                        <button onclick="openAddCustomerModal()" 
-                                    class="bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 transition-colors">
-                                <i data-lucide="plus" class="w-5 h-5 inline mr-2"></i>
-                                Add Customer
-                            </button>
-                            <a href="/logout" class="text-red-600 hover:text-red-700 font-medium transition-colors">
-                                <i data-lucide="log-out" class="w-4 h-4 inline mr-2"></i>
-                                Logout
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </header>
-            
-            <main class="p-6">
                 <!-- Customer List -->
                 <div class="bg-white rounded-lg shadow">
                     <div class="px-6 py-4 border-b border-gray-200">
@@ -140,10 +54,6 @@
                         </div>
                     </div>
                 </div>
-            </main>
-        </div>
-    </div>
-    
     <!-- Edit Customer Modal -->
     <div id="editCustomerModal" class="hidden fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
         <div class="relative top-20 mx-auto p-5 border w-full max-w-4xl shadow-lg rounded-md bg-white">
@@ -451,7 +361,7 @@
                             Cancel
                         </button>
                         <button type="submit" 
-                                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
                             Update Customer
                         </button>
                     </div>
@@ -766,7 +676,7 @@
                             Cancel
                         </button>
                         <button type="submit" 
-                                class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                class="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700">
                             Add Customer
                         </button>
                     </div>
@@ -775,7 +685,10 @@
         </div>
     </div>
     
-    <script>
+{% endblock %}
+
+{% block scripts %}
+<script>
         let customers = [];
         
         // Load customers on page load
@@ -1243,5 +1156,4 @@
             document.getElementById('customerCount').textContent = `${filteredCustomers.length} customers`;
         });
     </script>
-</body>
-</html>
+{% endblock %}

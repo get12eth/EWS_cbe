@@ -1,476 +1,394 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Predict Risk - CBE EWS</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/static/dashboard.css">
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        .sidebar-item { transition: all 0.3s ease; }
-        .sidebar-item:hover { background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; }
-        .sidebar-item.active { background-color: rgba(59, 130, 246, 0.1); border-left: 4px solid #3b82f6; }
-        .action-btn { transition: all 0.2s ease; }
-        .action-btn:hover { transform: scale(1.05); }
-    </style>
-</head>
-<body class="bg-gray-50">
-    <div class="flex h-screen">
-        <div class="w-64 bg-white shadow-lg">
-            <div class="p-4 border-b">
-                <div class="flex items-center space-x-3">
-                    <img src="/static/image/cbe_l.jpg" alt="CBE Logo" class="w-10 h-10 rounded-lg object-cover">
-                    <div>
-                        <h1 class="text-lg font-bold text-gray-900">CBE EWS</h1>
-                        <p class="text-xs text-gray-500">Loan Management System</p>
-                    </div>
-                </div>
-            </div>
-            
-            <nav class="p-4">
-                <div class="space-y-6">
-                    <div>
-                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Main</h3>
-                        <a href="/dashboard" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
-                            <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
-                            <span>Dashboard</span>
-                        </a>
-                    </div>
-                    
-                    <div>
-                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Risk Management</h3>
-                        <div class="space-y-1">
-                            <a href="/customers" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
-                                <i data-lucide="users" class="w-5 h-5"></i>
-                                <span>Customers</span>
-                            </a>
-                            <a href="/predict" class="sidebar-item flex items-center space-x-3 text-blue-600 p-2 rounded-lg bg-blue-50">
-                                <i data-lucide="trending-up" class="w-5 h-5"></i>
-                                <span>Predict Risk</span>
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </nav>
-            
-            <div class="absolute bottom-0 left-0 right-0 p-4 border-t">
-                <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                        <i data-lucide="user" class="w-4 h-4 text-gray-600"></i>
-                    </div>
-                    <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-900">{{ user }}</p>
-                        <p class="text-xs text-gray-500">Administrator</p>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <div class="flex-1 overflow-auto">
-            <header class="bg-white shadow-sm border-b">
-                <div class="px-6 py-4">
-                    <div class="flex items-center justify-between">
-                        <div>
-                            <h2 class="text-2xl font-bold text-gray-900">Predict Risk</h2>
-                            <p class="text-gray-500">Loan risk prediction and analysis</p>
-                        </div>
-                        <div class="flex items-center space-x-4">
-                            <a href="/logout" class="text-red-600 hover:text-red-700 font-medium transition-colors">
-                                <i data-lucide="log-out" class="w-4 h-4 inline mr-2"></i>
-                                Logout
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            </header>
-            
-            <main class="p-6">
-                <div class="bg-white rounded-lg shadow">
-                    <div class="px-6 py-4 border-b border-gray-200">
-                        <div class="flex items-center justify-between">
-                            <h3 class="text-lg font-semibold text-gray-900">Customer Risk Prediction</h3>
-                            <span class="text-sm text-gray-500">Select a customer for risk assessment</span>
-                        </div>
-                    </div>
-                    
-                    <!-- Customer Selection -->
-                    <div class="p-6">
-                        <div class="mb-6">
-                            <label class="block text-sm font-medium text-gray-700 mb-2">Select Customer</label>
-                            <select id="customerSelect" class="w-full px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
-                                <option value="">Choose a customer...</option>
-                            </select>
-                        </div>
-                        
-                        <!-- Customer Details Display -->
-                        <div id="customerDetails" class="hidden mb-6 p-4 bg-gray-50 rounded-lg">
-                            <h4 class="text-md font-semibold text-gray-900 mb-3">Customer Information</h4>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <span class="text-sm text-gray-500">Contract Code:</span>
-                                    <p id="detailContractCode" class="font-medium"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm text-gray-500">Customer Name:</span>
-                                    <p id="detailCustomerName" class="font-medium"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm text-gray-500">District:</span>
-                                    <p id="detailDistrict" class="font-medium"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm text-gray-500">Region:</span>
-                                    <p id="detailRegion" class="font-medium"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm text-gray-500">Principal Amount:</span>
-                                    <p id="detailPrincipal" class="font-medium"></p>
-                                </div>
-                                <div>
-                                    <span class="text-sm text-gray-500">Economic Sector:</span>
-                                    <p id="detailSector" class="font-medium"></p>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        <!-- Predict Button -->
-                        <div class="flex justify-end">
-                            <button id="predictBtn" onclick="predictCustomerRisk()" disabled 
-                                    class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
-                                <i data-lucide="trending-up" class="w-5 h-5 inline mr-2"></i>
-                                Predict Risk
-                            </button>
-                        </div>
-                    </div>
-                    
-                    <div id="predictionResult" class="hidden p-6">
-                        <div class="bg-blue-50 border border border-blue-200 rounded-lg p-4">
-                            <h3 class="text-lg font-semibold text-blue-900 mb-2">Prediction Result</h3>
-                            <div id="resultContent" class="text-gray-700">
-                                <!-- Result will be displayed here -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </main>
+{% extends "base.html" %}
+
+{% set title = "Customer Risk Prediction" %}
+{% set page_title = "Customer Risk Prediction" %}
+{% set page_description = "Select a customer for risk assessment" %}
+{% set active_page = "predict" %}
+
+{% block content %}
+<div class="bg-white rounded-lg shadow">
+    <div class="px-6 py-4 border-b border-gray-200">
+        <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">Customer Risk Prediction</h3>
+            <span class="text-sm text-gray-500">Select a customer for risk assessment</span>
         </div>
     </div>
-    
-    <script>
-        let customers = [];
-        
-        document.addEventListener('DOMContentLoaded', function() {
-            lucide.createIcons();
-            loadCustomers();
-        });
-        
-        async function loadCustomers() {
-            try {
-                console.log('Loading customers...');
-                const response = await fetch('/api/customers');
-                console.log('Response status:', response.status);
-                console.log('Response headers:', response.headers);
-                console.log('Response ok:', response.ok);
-                
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Response data:', data);
-                    console.log('Data type:', typeof data);
-                    console.log('Data keys:', Object.keys(data));
-                    
-                    // Check if response has expected structure
-                    if (data && data.success && data.customers && Array.isArray(data.customers)) {
-                        console.log('Customers array length:', data.customers.length);
-                        console.log('First customer sample:', data.customers[0]);
-                        
-                        customers = data.customers;
-                        populateCustomerSelect();
-                    } else {
-                        console.error('Invalid response structure:', data);
-                        // Show detailed error in UI
-                        const select = document.getElementById('customerSelect');
-                        const detailsDiv = document.getElementById('customerDetails');
-                        
-                        if (select) {
-                            select.innerHTML = '<option value="">API Error - Invalid response structure</option>';
-                            select.style.borderColor = '#ef4444';
-                            select.style.backgroundColor = '#fee2e2';
-                        }
-                        
-                        if (detailsDiv) {
-                            detailsDiv.innerHTML = `
-                                <div style="padding: 20px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 10px 0;">
-                                    <h4 style="color: #d97725; margin: 0 0 10px 0;">API Response Error</h4>
-                                    <p style="color: #721c24;">The customer API returned an invalid response structure.</p>
-                                    <p style="color: #721c24;">Expected: {success: true, customers: [...]}</p>
-                                    <p style="color: #721c24;">Received: ${JSON.stringify(data, null, 2)}</p>
-                                    <button onclick="loadCustomers()" style="background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Retry</button>
-                                </div>
-                            `;
-                        }
-                    }
+
+    <!-- Customer Selection -->
+    <div class="p-6">
+        <div class="mb-6">
+            <label class="block text-sm font-medium text-gray-700 mb-2">Select Customer</label>
+            <select id="customerSelect" class="w-full px-3 py-2 border border-purple-300 rounded-md focus:outline-none focus:ring-2 focus:ring-purple-500">
+                <option value="">Choose a customer...</option>
+            </select>
+        </div>
+
+        <!-- Customer Details Display -->
+        <div id="customerDetails" class="hidden mb-6 p-4 bg-gray-50 rounded-lg">
+            <h4 class="text-md font-semibold text-gray-900 mb-3">Customer Information</h4>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <span class="text-sm text-gray-500">Contract Code:</span>
+                    <p id="detailContractCode" class="font-medium"></p>
+                </div>
+                <div>
+                    <span class="text-sm text-gray-500">Customer Name:</span>
+                    <p id="detailCustomerName" class="font-medium"></p>
+                </div>
+                <div>
+                    <span class="text-sm text-gray-500">District:</span>
+                    <p id="detailDistrict" class="font-medium"></p>
+                </div>
+                <div>
+                    <span class="text-sm text-gray-500">Region:</span>
+                    <p id="detailRegion" class="font-medium"></p>
+                </div>
+                <div>
+                    <span class="text-sm text-gray-500">Principal Amount:</span>
+                    <p id="detailPrincipal" class="font-medium"></p>
+                </div>
+                <div>
+                    <span class="text-sm text-gray-500">Economic Sector:</span>
+                    <p id="detailSector" class="font-medium"></p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Predict Button -->
+        <div class="flex justify-end">
+            <button id="predictBtn" onclick="predictCustomerRisk()" disabled
+                    class="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+                <i data-lucide="trending-up" class="w-5 h-5 inline mr-2"></i>
+                Predict Risk
+            </button>
+        </div>
+    </div>
+
+    <div id="predictionResult" class="hidden p-6">
+        <div class="bg-blue-50 border border border-blue-200 rounded-lg p-4">
+            <h3 class="text-lg font-semibold text-blue-900 mb-2">Prediction Result</h3>
+            <div id="resultContent" class="text-gray-700">
+                <!-- Result will be displayed here -->
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let customers = [];
+
+    document.addEventListener('DOMContentLoaded', function() {
+        lucide.createIcons();
+        loadCustomers();
+    });
+
+    async function loadCustomers() {
+        try {
+            console.log('Loading customers...');
+            const response = await fetch('/api/customers');
+            console.log('Response status:', response.status);
+            console.log('Response headers:', response.headers);
+            console.log('Response ok:', response.ok);
+
+            if (response.ok) {
+                const data = await response.json();
+                console.log('Response data:', data);
+                console.log('Data type:', typeof data);
+                console.log('Data keys:', Object.keys(data));
+
+                // Check if response has expected structure
+                if (data && data.success && data.customers && Array.isArray(data.customers)) {
+                    console.log('Customers array length:', data.customers.length);
+                    console.log('First customer sample:', data.customers[0]);
+
+                    customers = data.customers;
+                    populateCustomerSelect();
                 } else {
-                    console.error('HTTP Error - Status:', response.status);
+                    console.error('Invalid response structure:', data);
+                    // Show detailed error in UI
                     const select = document.getElementById('customerSelect');
                     const detailsDiv = document.getElementById('customerDetails');
-                    
+
                     if (select) {
-                        select.innerHTML = '<option value="">HTTP Error ${response.status}</option>';
+                        select.innerHTML = '<option value="">API Error - Invalid response structure</option>';
                         select.style.borderColor = '#ef4444';
                         select.style.backgroundColor = '#fee2e2';
                     }
-                    
+
                     if (detailsDiv) {
                         detailsDiv.innerHTML = `
                             <div style="padding: 20px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 10px 0;">
-                                <h4 style="color: #d97725; margin: 0 0 10px 0;">HTTP Error ${response.status}</h4>
-                                <p style="color: #721c24;">Failed to load customers from server.</p>
-                                <p style="color: #721c24;">Status: ${response.status}</p>
+                                <h4 style="color: #d97725; margin: 0 0 10px 0;">API Response Error</h4>
+                                <p style="color: #721c24;">The customer API returned an invalid response structure.</p>
+                                <p style="color: #721c24;">Expected: {success: true, customers: [...]}</p>
+                                <p style="color: #721c24;">Received: ${JSON.stringify(data, null, 2)}</p>
                                 <button onclick="loadCustomers()" style="background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Retry</button>
                             </div>
                         `;
                     }
                 }
-            } catch (error) {
-                console.error('Network error loading customers:', error);
+            } else {
+                console.error('HTTP Error - Status:', response.status);
                 const select = document.getElementById('customerSelect');
                 const detailsDiv = document.getElementById('customerDetails');
-                
+
                 if (select) {
-                    select.innerHTML = '<option value="">Network Error</option>';
+                    select.innerHTML = '<option value="">HTTP Error ${response.status}</option>';
                     select.style.borderColor = '#ef4444';
                     select.style.backgroundColor = '#fee2e2';
                 }
-                
+
                 if (detailsDiv) {
                     detailsDiv.innerHTML = `
                         <div style="padding: 20px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 10px 0;">
-                            <h4 style="color: #d97725; margin: 0 0 10px 0;">Network Error</h4>
-                            <p style="color: #721c24;">Failed to connect to the server.</p>
-                            <p style="color: #721c24;">Please check your connection and try again.</p>
+                            <h4 style="color: #d97725; margin: 0 0 10px 0;">HTTP Error ${response.status}</h4>
+                            <p style="color: #721c24;">Failed to load customers from server.</p>
+                            <p style="color: #721c24;">Status: ${response.status}</p>
                             <button onclick="loadCustomers()" style="background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Retry</button>
                         </div>
                     `;
                 }
             }
-        }
-        
-        function populateCustomerSelect() {
+        } catch (error) {
+            console.error('Network error loading customers:', error);
             const select = document.getElementById('customerSelect');
-            select.innerHTML = '<option value="">Choose a customer...</option>';
-            
-            customers.forEach(customer => {
-                const option = document.createElement('option');
-                option.value = customer.CONTRACT_CODE;
-                option.textContent = `${customer.CONTRACT_CODE} - ${customer.CUST_SHORTNAME || customer.CUSTOMER_NAME || 'Unknown'}`;
-                select.appendChild(option);
-            });
-        }
-        
-        document.getElementById('customerSelect').addEventListener('change', function() {
-            const contractCode = this.value;
-            const predictBtn = document.getElementById('predictBtn');
-            const customerDetails = document.getElementById('customerDetails');
-            
-            if (contractCode) {
-                const customer = customers.find(c => c.CONTRACT_CODE === contractCode);
-                if (customer) {
-                    displayCustomerDetails(customer);
-                    customerDetails.classList.remove('hidden');
-                    predictBtn.disabled = false;
-                }
-            } else {
-                customerDetails.classList.add('hidden');
-                predictBtn.disabled = true;
+            const detailsDiv = document.getElementById('customerDetails');
+
+            if (select) {
+                select.innerHTML = '<option value="">Network Error</option>';
+                select.style.borderColor = '#ef4444';
+                select.style.backgroundColor = '#fee2e2';
             }
+
+            if (detailsDiv) {
+                detailsDiv.innerHTML = `
+                    <div style="padding: 20px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 8px; margin: 10px 0;">
+                        <h4 style="color: #d97725; margin: 0 0 10px 0;">Network Error</h4>
+                        <p style="color: #721c24;">Failed to connect to the server.</p>
+                        <p style="color: #721c24;">Please check your connection and try again.</p>
+                        <button onclick="loadCustomers()" style="background: #4CAF50; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer;">Retry</button>
+                    </div>
+                `;
+            }
+        }
+    }
+
+    function populateCustomerSelect() {
+        const select = document.getElementById('customerSelect');
+        select.innerHTML = '<option value="">Choose a customer...</option>';
+
+        customers.forEach(customer => {
+            const option = document.createElement('option');
+            option.value = customer.CONTRACT_CODE;
+            option.textContent = `${customer.CONTRACT_CODE} - ${customer.CUST_SHORTNAME || customer.CUSTOMER_NAME || 'Unknown'}`;
+            select.appendChild(option);
         });
-        
-        function displayCustomerDetails(customer) {
-            console.log('Displaying customer details:', customer);
-            console.log('Customer keys:', Object.keys(customer));
-            console.log('CONTRACT_CODE:', customer.CONTRACT_CODE);
-            console.log('CUST_SHORTNAME:', customer.CUST_SHORTNAME);
-            console.log('CUSTOMER_NAME:', customer.CUSTOMER_NAME);
-            console.log('DISTRICTNAME:', customer.DISTRICTNAME);
-            console.log('REGIONNAME:', customer.REGIONNAME);
-            console.log('APPROVED_AMOUNT:', customer.APPROVED_AMOUNT);
-            console.log('PRINCIPAL_OS:', customer.PRINCIPAL_OS);
-            
-            // Try to find the correct field names
-            const contractCode = customer.CONTRACT_CODE || customer.contract_code || 'N/A';
-            const customerName = customer.CUST_SHORTNAME || customer.CUSTOMER_NAME || customer.customer_name || 'N/A';
-            const district = customer.DISTRICTNAME || customer.districtname || 'N/A';
-            const region = customer.REGIONNAME || customer.regionname || 'N/A';
-            const principal = customer.APPROVED_AMOUNT || customer.approved_amount || customer.PRINCIPAL_OS || customer.principal_os || 'N/A';
-            
-            console.log('Final values:', { contractCode, customerName, district, region, principal });
-            
-            document.getElementById('detailContractCode').textContent = contractCode;
-            document.getElementById('detailCustomerName').textContent = customerName;
-            document.getElementById('detailDistrict').textContent = district;
-            document.getElementById('detailRegion').textContent = region;
-            document.getElementById('detailPrincipal').textContent = principal && principal !== 'N/A' ? `ETB ${parseFloat(principal).toLocaleString()}` : 'N/A';
-            document.getElementById('detailSector').textContent = customer.ECONOMIC_SECTOR || 'N/A';
-        }
-        
-        async function predictCustomerRisk() {
-            const contractCode = document.getElementById('customerSelect').value;
-            
-            if (!contractCode) {
-                alert('Please select a customer first');
-                return;
-            }
-            
-            // Find the customer object to get the actual ID
+    }
+
+    document.getElementById('customerSelect').addEventListener('change', function() {
+        const contractCode = this.value;
+        const predictBtn = document.getElementById('predictBtn');
+        const customerDetails = document.getElementById('customerDetails');
+
+        if (contractCode) {
             const customer = customers.find(c => c.CONTRACT_CODE === contractCode);
-            if (!customer) {
-                alert('Customer not found');
-                return;
-            }
-            
-            const customerId = customer.id;
-            console.log('Predicting risk for customer ID:', customerId, 'Contract Code:', contractCode);
-            
-            const predictBtn = document.getElementById('predictBtn');
-            predictBtn.disabled = true;
-            predictBtn.innerHTML = '<i data-lucide="loader" class="w-5 h-5 inline mr-2 animate-spin"></i>Predicting...';
-            lucide.createIcons();
-            
-            try {
-                const response = await fetch(`/api/customers/${customerId}/predict`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                });
-                
-                const result = await response.json();
-                
-                if (response.ok) {
-                    displayPredictionResult(result);
-                    // Refresh Customer Management table if it exists
-                    refreshCustomerManagementTable();
-                } else {
-                    alert('Error: ' + result.detail);
-                }
-            } catch (error) {
-                console.error('Error predicting risk:', error);
-                alert('Failed to predict risk. Please try again.');
-            } finally {
+            if (customer) {
+                displayCustomerDetails(customer);
+                customerDetails.classList.remove('hidden');
                 predictBtn.disabled = false;
-                predictBtn.innerHTML = '<i data-lucide="trending-up" class="w-5 h-5 inline mr-2"></i>Predict Risk';
-                lucide.createIcons();
             }
+        } else {
+            customerDetails.classList.add('hidden');
+            predictBtn.disabled = true;
         }
-        
-        function refreshCustomerManagementTable() {
-            // Check if we're on Customer Management page and refresh the table
-            if (window.location.pathname === '/customers') {
-                // If we're on the customers page, call the loadCustomers function
-                if (typeof loadCustomers === 'function') {
-                    loadCustomers();
-                }
+    });
+
+    function displayCustomerDetails(customer) {
+        console.log('Displaying customer details:', customer);
+        console.log('Customer keys:', Object.keys(customer));
+        console.log('CONTRACT_CODE:', customer.CONTRACT_CODE);
+        console.log('CUST_SHORTNAME:', customer.CUST_SHORTNAME);
+        console.log('CUSTOMER_NAME:', customer.CUSTOMER_NAME);
+        console.log('DISTRICTNAME:', customer.DISTRICTNAME);
+        console.log('REGIONNAME:', customer.REGIONNAME);
+        console.log('APPROVED_AMOUNT:', customer.APPROVED_AMOUNT);
+        console.log('PRINCIPAL_OS:', customer.PRINCIPAL_OS);
+
+        // Try to find the correct field names
+        const contractCode = customer.CONTRACT_CODE || customer.contract_code || 'N/A';
+        const customerName = customer.CUST_SHORTNAME || customer.CUSTOMER_NAME || customer.customer_name || 'N/A';
+        const district = customer.DISTRICTNAME || customer.districtname || 'N/A';
+        const region = customer.REGIONNAME || customer.regionname || 'N/A';
+        const principal = customer.APPROVED_AMOUNT || customer.approved_amount || customer.PRINCIPAL_OS || customer.principal_os || 'N/A';
+
+        console.log('Final values:', { contractCode, customerName, district, region, principal });
+
+        document.getElementById('detailContractCode').textContent = contractCode;
+        document.getElementById('detailCustomerName').textContent = customerName;
+        document.getElementById('detailDistrict').textContent = district;
+        document.getElementById('detailRegion').textContent = region;
+        document.getElementById('detailPrincipal').textContent = principal && principal !== 'N/A' ? `ETB ${parseFloat(principal).toLocaleString()}` : 'N/A';
+        document.getElementById('detailSector').textContent = customer.ECONOMIC_SECTOR || 'N/A';
+    }
+
+    async function predictCustomerRisk() {
+        const contractCode = document.getElementById('customerSelect').value;
+
+        if (!contractCode) {
+            alert('Please select a customer first');
+            return;
+        }
+
+        // Find the customer object to get the actual ID
+        const customer = customers.find(c => c.CONTRACT_CODE === contractCode);
+        if (!customer) {
+            alert('Customer not found');
+            return;
+        }
+
+        const customerId = customer.id;
+        console.log('Predicting risk for customer ID:', customerId, 'Contract Code:', contractCode);
+
+        const predictBtn = document.getElementById('predictBtn');
+        predictBtn.disabled = true;
+        predictBtn.innerHTML = '<i data-lucide="loader" class="w-5 h-5 inline mr-2 animate-spin"></i>Predicting...';
+        lucide.createIcons();
+
+        try {
+            const response = await fetch(`/api/customers/${customerId}/predict`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const result = await response.json();
+
+            if (response.ok) {
+                displayPredictionResult(result);
+                // Refresh Customer Management table if it exists
+                refreshCustomerManagementTable();
             } else {
-                // If we're on a different page, we can use localStorage to signal refresh
-                localStorage.setItem('refreshCustomerTable', Date.now());
+                alert('Error: ' + result.detail);
             }
+        } catch (error) {
+            console.error('Error predicting risk:', error);
+            alert('Failed to predict risk. Please try again.');
+        } finally {
+            predictBtn.disabled = false;
+            predictBtn.innerHTML = '<i data-lucide="trending-up" class="w-5 h-5 inline mr-2"></i>Predict Risk';
+            lucide.createIcons();
         }
-        
-        function displayPredictionResult(result) {
-            const resultDiv = document.getElementById('predictionResult');
-            const resultContent = document.getElementById('resultContent');
-            
-            // Add debugging to see what we're getting
-            console.log('Prediction result:', result);
-            console.log('Result keys:', Object.keys(result));
-            
-            // Handle missing or undefined values safely
-            const prediction = result.prediction || 'Unknown';
-            const nplProb = result.npl_probability || 0;
-            const allProbabilities = result.all_probabilities || {};
-            const smeProb = allProbabilities.SME || 0;
-            const riskLevel = result.risk_level || 'Unknown';
-            
-            // Debug logging
-            console.log('Prediction:', prediction);
-            console.log('All probabilities:', allProbabilities);
-            console.log('SME probability:', smeProb);
-            console.log('Risk level:', riskLevel);
-            console.log('Is SME probability valid:', !isNaN(smeProb));
-            console.log('SME probability percentage:', (smeProb * 100).toFixed(2) + '%');
-            
-            // Update risk class and background based on prediction (4 classes: PAS, SME, SET, NPL)
-            let riskClass, riskBg;
-            if (prediction === 'SME') {
-                riskClass = 'text-orange-600';
-                riskBg = 'bg-orange-50';
-            } else if (prediction === 'NPL') {
-                riskClass = 'text-red-600';
-                riskBg = 'bg-red-50';
-            } else if (prediction === 'SET') {
-                riskClass = 'text-blue-600';
-                riskBg = 'bg-blue-50';
-            } else { // PAS or Normal
-                riskClass = 'text-green-600';
-                riskBg = 'bg-green-50';
+    }
+
+    function refreshCustomerManagementTable() {
+        // Check if we're on Customer Management page and refresh the table
+        if (window.location.pathname === '/customers') {
+            // If we're on the customers page, call the loadCustomers function
+            if (typeof loadCustomers === 'function') {
+                loadCustomers();
             }
-            
-            // Update border color based on prediction
-            let borderClass;
-            if (prediction === 'SME') {
-                borderClass = 'border-orange-200';
-            } else if (prediction === 'NPL') {
-                borderClass = 'border-red-200';
-            } else if (prediction === 'SET') {
-                borderClass = 'border-blue-200';
-            } else { // PAS or Normal
-                borderClass = 'border-green-200';
-            }
-            
-            resultContent.innerHTML = `
-                <div class="p-4 ${riskBg} rounded-lg border ${borderClass}">
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                            <span class="text-sm text-gray-500">Risk Status:</span>
-                            <p class="font-semibold ${riskClass}">
-                                ${prediction}
-                            </p>
-                        </div>
-                        <div>
-                            <span class="text-sm text-gray-500">SME Probability:</span>
-                            <p class="font-semibold">${!isNaN(smeProb) ? (smeProb * 100).toFixed(2) + '%' : 'N/A'}</p>
-                        </div>
-                        <div>
-                            <span class="text-sm text-gray-500">Prediction Date:</span>
-                            <p class="font-semibold">${new Date().toLocaleDateString()}</p>
-                        </div>
-                        <div>
-                            <span class="text-sm text-gray-500">Risk Level:</span>
-                            <div class="mt-1">
-                                <div class="w-full bg-gray-200 rounded-full h-2">
-                                    <div class="h-2 rounded-full ${prediction === 'SME' ? 'bg-orange-600' : prediction === 'NPL' ? 'bg-red-600' : prediction === 'SET' ? 'bg-blue-600' : 'bg-green-600'}" 
-                                         style="width: ${!isNaN(smeProb) ? (smeProb * 100) + '%' : '0%'}"></div>
-                                </div>
+        } else {
+            // If we're on a different page, we can use localStorage to signal refresh
+            localStorage.setItem('refreshCustomerTable', Date.now());
+        }
+    }
+
+    function displayPredictionResult(result) {
+        const resultDiv = document.getElementById('predictionResult');
+        const resultContent = document.getElementById('resultContent');
+
+        // Add debugging to see what we're getting
+        console.log('Prediction result:', result);
+        console.log('Result keys:', Object.keys(result));
+
+        // Handle missing or undefined values safely
+        const prediction = result.prediction || 'Unknown';
+        const nplProb = result.npl_probability || 0;
+        const allProbabilities = result.all_probabilities || {};
+        const smeProb = allProbabilities.SME || 0;
+        const riskLevel = result.risk_level || 'Unknown';
+
+        // Debug logging
+        console.log('Prediction:', prediction);
+        console.log('All probabilities:', allProbabilities);
+        console.log('SME probability:', smeProb);
+        console.log('Risk level:', riskLevel);
+        console.log('Is SME probability valid:', !isNaN(smeProb));
+        console.log('SME probability percentage:', (smeProb * 100).toFixed(2) + '%');
+
+        // Update risk class and background based on prediction (4 classes: PAS, SME, SET, NPL)
+        let riskClass, riskBg;
+        if (prediction === 'SME') {
+            riskClass = 'text-orange-600';
+            riskBg = 'bg-orange-50';
+        } else if (prediction === 'NPL') {
+            riskClass = 'text-red-600';
+            riskBg = 'bg-red-50';
+        } else if (prediction === 'SET') {
+            riskClass = 'text-blue-600';
+            riskBg = 'bg-blue-50';
+        } else { // PAS or Normal
+            riskClass = 'text-green-600';
+            riskBg = 'bg-green-50';
+        }
+
+        // Update border color based on prediction
+        let borderClass;
+        if (prediction === 'SME') {
+            borderClass = 'border-orange-200';
+        } else if (prediction === 'NPL') {
+            borderClass = 'border-red-200';
+        } else if (prediction === 'SET') {
+            borderClass = 'border-blue-200';
+        } else { // PAS or Normal
+            borderClass = 'border-green-200';
+        }
+
+        resultContent.innerHTML = `
+            <div class="p-4 ${riskBg} rounded-lg border ${borderClass}">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <span class="text-sm text-gray-500">Risk Status:</span>
+                        <p class="font-semibold ${riskClass}">
+                            ${prediction}
+                        </p>
+                    </div>
+                    <div>
+                        <span class="text-sm text-gray-500">SME Probability:</span>
+                        <p class="font-semibold">${!isNaN(smeProb) ? (smeProb * 100).toFixed(2) + '%' : 'N/A'}</p>
+                    </div>
+                    <div>
+                        <span class="text-sm text-gray-500">Prediction Date:</span>
+                        <p class="font-semibold">${new Date().toLocaleDateString()}</p>
+                    </div>
+                    <div>
+                        <span class="text-sm text-gray-500">Risk Level:</span>
+                        <div class="mt-1">
+                            <div class="w-full bg-gray-200 rounded-full h-2">
+                                <div class="h-2 rounded-full ${prediction === 'SME' ? 'bg-orange-600' : prediction === 'NPL' ? 'bg-red-600' : prediction === 'SET' ? 'bg-blue-600' : 'bg-green-600'}"
+                                     style="width: ${!isNaN(smeProb) ? (smeProb * 100) + '%' : '0%'}"></div>
                             </div>
                         </div>
                     </div>
-                    <div class="mt-4">
-                        <h4 class="font-semibold text-gray-900 mb-2">Risk Assessment</h4>
-                        <p class="text-gray-600">${prediction === 'SME' ? 
-                            'This loan is classified as MEDIUM RISK. Enhanced monitoring recommended for SME status.' : 
-                            prediction === 'NPL' ? 
-                            'This loan is classified as HIGH RISK. Immediate attention recommended.' : 
-                            prediction === 'SET' ? 
-                            'This loan is classified as MEDIUM RISK. Settled loan status requires monitoring.' : 
-                            'This loan is classified as LOW RISK. Normal monitoring recommended.'}</p>
-                    </div>
                 </div>
-            `;
-            
-            resultDiv.classList.remove('hidden');
-        }
-        
-    </script>
-</body>
-</html>
+                <div class="mt-4">
+                    <h4 class="font-semibold text-gray-900 mb-2">Risk Assessment</h4>
+                    <p class="text-gray-600">${prediction === 'SME' ?
+                        'This loan is classified as MEDIUM RISK. Enhanced monitoring recommended for SME status.' :
+                        prediction === 'NPL' ?
+                        'This loan is classified as HIGH RISK. Immediate attention recommended.' :
+                        prediction === 'SET' ?
+                        'This loan is classified as MEDIUM RISK. Settled loan status requires monitoring.' :
+                        'This loan is classified as LOW RISK. Normal monitoring recommended.'}</p>
+                </div>
+            </div>
+        `;
+
+        resultDiv.classList.remove('hidden');
+    }
+
+</script>
+{% endblock %}
