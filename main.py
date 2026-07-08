@@ -63,11 +63,9 @@ templates.env.globals['get_user_role'] = get_user_role
 #Password hashing context
 pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 
-
 #Database connection helper (uses local MySQL with provided root password)
 def get_db_connection():
     return mysql.connector.connect(host='localhost', user='root', password='Bant@6963', database='lon-default')
-
 
 def _get_user_info(username: str) -> Optional[Dict]:
     """Return user record from users table or None if unavailable."""
@@ -81,7 +79,6 @@ def _get_user_info(username: str) -> Optional[Dict]:
         return user
     except Exception:
         return None
-
 
 def _require_roles(request: Request, allowed_roles: List[str]) -> Optional[Dict]:
     """Check session user role against allowed_roles. Returns user dict if allowed, otherwise None."""
@@ -145,11 +142,11 @@ except Exception as e:
     model_governance = None
     simulation_engine = None
 
-# If set to '1' (default) DB writes and alert creation will be skipped to
+#If set to '1' (default) DB writes and alert creation will be skipped to
 # avoid SSL/schema/runtime DB issues during testing. Set to '0' to enable writes.
 SKIP_DB_WRITES = os.environ.get('SKIP_DB_WRITES', '1') == '1'
 
-# 3. Add Root Route - redirect to dashboard
+#3. Add Root Route - redirect to dashboard
 @app.get('/', response_class=HTMLResponse)
 async def root(request: Request):
     """Root route - show login page or redirect to dashboard"""
@@ -363,7 +360,7 @@ except Exception:
 
 logger.info(f"CLASS_THRESHOLDS set to: {CLASS_THRESHOLDS}")
 
-# If a fast-calibrated thresholds file exists, load and apply numeric thresholds
+#If a fast-calibrated thresholds file exists, load and apply numeric thresholds
 cal_file = 'calibrated_thresholds_fast.json'
 if os.path.exists(cal_file):
     try:
@@ -421,8 +418,6 @@ def prepare_model_input(customer_data):
         
         #Rename columns to match model expectations
         data = data.rename(columns=column_mapping)
-        
-        
     
         #Fill missing categorical values with 'Unknown'
         categorical_cols = ['TENURE', 'TERM', 'LOAN_TYPE', 'LOAN_DESCRIPTION', 'LOAN_PRODUCT', 
@@ -487,7 +482,7 @@ def prepare_model_input(customer_data):
                 X[c] = X[c].fillna('Unknown').astype(str).apply(lambda v: float(abs(hash(v)) % 1000))
         
         #Finally, apply scaler if available (not required for tree models but matches training pipeline)
-        # Ensure all columns are numeric: coerce and replace non-numeric with deterministic hash
+        #Ensure all columns are numeric: coerce and replace non-numeric with deterministic hash
         for col in X.columns:
             if X[col].dtype == object:
                 X[col] = X[col].astype(str)
@@ -677,7 +672,7 @@ async def get_risk_distribution():
                     'total': total
                 })
         
-        # Sort by total risk count (descending)
+        #Sort by total risk count (descending)
         regions.sort(key=lambda x: x['total'], reverse=True)
         
         return {'regions': regions}
@@ -733,7 +728,7 @@ async def get_portfolio_overview():
         cursor.close()
         conn.close()
         
-        # Calculate portfolio metrics
+        #Calculate portfolio metrics
         total_customers = sum(status_data.values())
         
         # Calculate total approved amount by status
@@ -743,7 +738,7 @@ async def get_portfolio_overview():
                 amount_by_status[status] = 0
             amount_by_status[status] += float(amount)
         
-        # Prepare data for chart
+        #Prepare data for chart
         portfolio_data = []
         colors = {
             'PAS': 'rgba(34, 197, 94, 0.8)',    # Green
@@ -889,7 +884,6 @@ async def loan_age_vs_risk(limit: int = 500):
             'status': row.get('STATUS')
         })
     return {'points': points}
-
 
 @app.get('/api/explain/{contract_code}')
 async def explain_loan(contract_code: str):
@@ -1188,7 +1182,7 @@ async def predict(
         conn.commit()
         cursor.close()
         
-        # Generate alerts if risk is high
+        #Generate alerts if risk is high
         if alerts_engine and sme_prob > 0.5:
             customer_data = {
                 'CONTRACT_CODE': CONTRACT_CODE,
@@ -1204,8 +1198,8 @@ async def predict(
             for alert in triggered_alerts:
                 alerts_engine.create_alert(alert)
         
-        # Generate SHAP explanation if model governance is available
-        # Keep explanation generation separate and tolerant to errors
+        #Generate SHAP explanation if model governance is available
+        #Keep explanation generation separate and tolerant to errors
         explanation = None
         if model_governance:
             try:
@@ -1226,7 +1220,7 @@ async def predict(
         # never allow history append to break response
         logger.debug("Failed to append prediction record to history, continuing")
 
-    # Determine risk level
+    #Determine risk level
     if predicted_status == 'NPL':
         risk_level = 'High Risk'
     elif predicted_status == 'SET':
@@ -1322,7 +1316,7 @@ def _sme_populate_loop(interval_minutes: int = 60, lookback_hours: int = 24, thr
             except Exception as e:
                 logger.error(f"Scheduled SME populate failed: {e}")
 
-            # Wait with early exit support
+            #Wait with early exit support
             scheduler_stop_event.wait(interval_minutes * 60)
     finally:
         logger.info('SME populate scheduler stopped')
@@ -1355,7 +1349,7 @@ async def create_alert_rule(rule_data: dict):
 # Note: acknowledge_alert and resolve_alert endpoints are defined later in the file with proper JSON handling and auth checks
 # Lines moved to around line 1895 to use Request object and JSON parsing
 
-# Alert escalation check endpoint
+#Alert escalation check endpoint
 @app.get('/api/alerts/check-escalations')
 async def check_alert_escalations():
     """Check for alerts that need escalation"""
@@ -1363,7 +1357,6 @@ async def check_alert_escalations():
         return {'error': 'Alerts engine not available'}
     escalated_count = alerts_engine.check_alert_escalations()
     return {'escalated_count': escalated_count}
-
 
 @app.post('/api/alerts/populate-sme')
 async def api_populate_sme_alerts(since_hours: int = 24, threshold: float = 0.5):
@@ -1472,7 +1465,7 @@ async def explain_model_prediction(contract_code: str):
             conn.close()
 
 @app.get('/api/model-governance/detect-drift')
-async def detect_data_drift():
+async def detect_data_drift():                                      
     """Detect data drift"""
     if not model_governance:
         return {'error': 'Model governance engine not available'}
@@ -1491,7 +1484,7 @@ async def log_model_performance(evaluation_date: str = Form(...), metrics: dict 
     except Exception as e:
         return {'error': str(e)}
 
-# Simulation Engine Endpoints
+#Simulation Engine Endpoints
 @app.get('/api/simulation/dashboard')
 async def simulation_dashboard():
     """Get simulation dashboard"""
@@ -1939,20 +1932,6 @@ async def predict_customer_risk(customer_id: int):
     except Exception as e:
         logger.error(f"Failed to predict customer risk: {e}")
         return {'success': False, 'error': str(e)}
-
-#Alerts API Endpoints
-@app.get('/api/alerts/dashboard')
-async def get_alerts_dashboard():
-    """Get alerts data for dashboard"""
-    try:
-        if alerts_engine:
-            dashboard_data = alerts_engine.get_alerts_dashboard()
-            return dashboard_data
-        else:
-            return {'error': 'Alerts engine not initialized'}
-    except Exception as e:
-        logger.error(f"Failed to get alerts dashboard: {e}")
-        return {'error': str(e)}
 
 @app.post('/api/alerts/{alert_id}/acknowledge')
 async def acknowledge_alert(alert_id: str, request: Request):

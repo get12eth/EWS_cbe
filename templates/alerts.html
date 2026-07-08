@@ -215,11 +215,10 @@ async function refreshAlerts() {
         if (data.recent_alerts) {
             currentAlerts = data.recent_alerts;
             updateAlertSummary(data.alert_summary);
-            updateAlertsTable(data.recent_alerts);
             updateBranchStats(data.branch_alerts);
             updateLastUpdated(data.last_updated);
+            applyFilters();
         }
-        // Always update scheduler display if provided
         if (data.sme_scheduler) {
             updateSchedulerInfo(data.sme_scheduler);
         }
@@ -582,6 +581,10 @@ document.getElementById('statusFilter').addEventListener('change', filterAlerts)
 document.getElementById('branchFilter').addEventListener('change', filterAlerts);
 
 function filterAlerts() {
+    applyFilters();
+}
+
+function applyFilters() {
     const searchTerm = document.getElementById('alertSearch').value.toLowerCase();
     const severityFilter = document.getElementById('severityFilter').value;
     const statusFilter = document.getElementById('statusFilter').value;
@@ -589,8 +592,8 @@ function filterAlerts() {
     
     const filteredAlerts = currentAlerts.filter(alert => {
         const matchesSearch = !searchTerm || 
-            alert.contract_code.toLowerCase().includes(searchTerm) ||
-            alert.description.toLowerCase().includes(searchTerm);
+            (alert.contract_code || '').toLowerCase().includes(searchTerm) ||
+            (alert.description || '').toLowerCase().includes(searchTerm);
         
         const matchesSeverity = !severityFilter || alert.severity === severityFilter;
         const matchesStatus = !statusFilter || alert.status === statusFilter;
