@@ -142,6 +142,22 @@ except Exception as e:
     model_governance = None
     simulation_engine = None
 
+# Wire model-governance drift investigations to the alerts engine so that
+# significant drift raises an operational alert automatically.
+if model_governance and alerts_engine:
+    try:
+        def _governance_alert_callback(title, context):
+            alerts_engine.create_alert({
+                'title': title,
+                'severity': 'high',
+                'category': 'model_governance',
+                'description': f"Drift investigation triggered. Features: {context.get('features')}",
+                'metadata': context
+            })
+        model_governance.set_alert_callback(_governance_alert_callback)
+    except Exception as e:
+        logger.warning(f"Could not register governance alert callback: {e}")
+
 #If set to '1' (default) DB writes and alert creation will be skipped to
 # avoid SSL/schema/runtime DB issues during testing. Set to '0' to enable writes.
 SKIP_DB_WRITES = os.environ.get('SKIP_DB_WRITES', '1') == '1'
@@ -345,8 +361,8 @@ remaining_cats = assets.get('remaining_cats', [])
 ord_enc = assets.get('ordinal_encoder')
 PREDICTION_HISTORY = []
 
-# Class probability thresholds to promote non-default classes when probability is meaningful.
-# Can be overridden via environment variable `CLASS_THRESHOLDS` as JSON, e.g. '{"NPL":0.01,"SME":0.03}'
+#Class probability thresholds to promote non-default classes when probability is meaningful.
+#Can be overridden via environment variable `CLASS_THRESHOLDS` as JSON, e.g. '{"NPL":0.01,"SME":0.03}'
 try:
     _ct = os.environ.get('CLASS_THRESHOLDS')
     if _ct:
@@ -1322,6 +1338,45 @@ def _sme_populate_loop(interval_minutes: int = 60, lookback_hours: int = 24, thr
         logger.info('SME populate scheduler stopped')
 
 
+def _model_eval_loop(interval_minutes: int = 360):
+    """Daemon thread loop to periodically run the model governance monitoring cycle.
+
+    Evaluates predictions against actual outcomes, detects drift (KS test), and
+    triggers automated investigations when significant drift is found.
+    """
+    logger.info(f"Model evaluation scheduler starting (interval {interval_minutes} minutes)")
+    try:
+        while not scheduler_stop_event.is_set():
+            try:
+                if model_governance:
+                    logger.info('Running scheduled model governance monitoring cycle')
+                    result = model_governance.run_monitoring_cycle()
+                    perf = result.get('performance') or {}
+                    if perf.get('evaluated'):
+                        logger.info(
+                            f"Model evaluation logged: {perf.get('evaluation_count')} samples, "
+                            f"accuracy={perf.get('accuracy')}, f1={perf.get('f1_score')}"
+                        )
+                    else:
+                        logger.info(f"Model evaluation skipped: {perf.get('reason')}")
+                    drift = result.get('drift') or {}
+                    if drift.get('baseline_captured'):
+                        logger.info('Model drift baseline captured')
+                    elif drift.get('features_with_drift'):
+                        logger.warning(f"Model drift detected on: {drift.get('features_with_drift')}")
+                    if result.get('investigation'):
+                        logger.warning('Automated model investigation triggered')
+                else:
+                    logger.warning('Model governance engine not initialized; skipping scheduled evaluation')
+            except Exception as e:
+                logger.error(f"Scheduled model evaluation failed: {e}")
+
+            # Wait with early exit support
+            scheduler_stop_event.wait(interval_minutes * 60)
+    finally:
+        logger.info('Model evaluation scheduler stopped')
+
+
 @app.on_event('startup')
 def _start_background_jobs():
     # Start SME populate scheduler thread with configured lookback and threshold
@@ -1483,6 +1538,46 @@ async def log_model_performance(evaluation_date: str = Form(...), metrics: dict 
         return {'success': True}
     except Exception as e:
         return {'error': str(e)}
+
+@app.post('/api/model-governance/feedback')
+async def submit_explanation_feedback(contract_code: str = Form(...), helpful: bool = Form(...), comment: str = Form(None)):
+    """Capture user feedback on an explanation to refine the XAI interface."""
+    if not model_governance:
+        return {'error': 'Model governance engine not available'}
+    return model_governance.log_explanation_feedback(contract_code, helpful, comment)
+
+@app.get('/api/model-governance/feedback-summary')
+async def explanation_feedback_summary():
+    """Aggregate explanation feedback for the XAI interface."""
+    if not model_governance:
+        return {'error': 'Model governance engine not available'}
+    return model_governance.get_feedback_summary()
+
+@app.get('/api/model-governance/curves')
+async def get_performance_curves():
+    """Get the latest ROC and Precision-Recall curves for the model."""
+    if not model_governance:
+        return {'error': 'Model governance engine not available'}
+    dash = model_governance.get_model_governance_dashboard()
+    return {
+        'roc': (dash.get('latest_curves') or {}).get('roc'),
+        'pr': (dash.get('latest_curves') or {}).get('pr'),
+        'latest_evaluation': dash.get('latest_evaluation')
+    }
+
+@app.post('/api/model-governance/capture-reference')
+async def capture_drift_reference_endpoint():
+    """Snap the current population as the drift reference baseline."""
+    if not model_governance:
+        return {'error': 'Model governance engine not available'}
+    return model_governance.capture_drift_reference()
+
+@app.post('/api/model-governance/monitor')
+async def run_monitoring_cycle_endpoint():
+    """Run the full monitoring cycle (evaluate + drift + investigation) on demand."""
+    if not model_governance:
+        return {'error': 'Model governance engine not available'}
+    return model_governance.run_monitoring_cycle()
 
 #Simulation Engine Endpoints
 @app.get('/api/simulation/dashboard')

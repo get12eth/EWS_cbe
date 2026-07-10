@@ -691,13 +691,13 @@
 <script>
         let customers = [];
         
-        // Load customers on page load
+        //Load customers on page load
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOMContentLoaded event fired');
             lucide.createIcons();
             loadCustomers();
             
-            // Listen for refresh signals from Predict Risk page
+            //Listen for refresh signals from Predict Risk page
             window.addEventListener('storage', function(e) {
                 if (e.key === 'refreshCustomerTable') {
                     loadCustomers();

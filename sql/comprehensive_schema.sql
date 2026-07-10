@@ -275,15 +275,23 @@ CREATE TABLE IF NOT EXISTS model_performance (
     recall DECIMAL(5,4),
     f1_score DECIMAL(5,4),
     auc_roc DECIMAL(5,4),
+    avg_precision DECIMAL(5,4),
+    npl_auc DECIMAL(5,4),
     total_predictions INT,
     correct_predictions INT,
-    
+
     -- Confusion matrix
     true_positives INT,
     false_positives INT,
     true_negatives INT,
     false_negatives INT,
-    
+
+    -- Extended governance metrics
+    confusion_matrix JSON,
+    per_class_metrics JSON,
+    npl_drift_score DECIMAL(8,6),
+    prediction_drift_score DECIMAL(8,6),
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -330,8 +338,56 @@ CREATE TABLE IF NOT EXISTS data_drift (
     is_drift_detected BOOLEAN DEFAULT FALSE,
     severity VARCHAR(20), -- 'low', 'medium', 'high'
     recommendation TEXT,
-    
+    ks_statistic DECIMAL(8,6),
+    p_value DECIMAL(12,10),
+    current_count INT,
+    reference_count INT,
+
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Model performance ROC / Precision-Recall curves
+CREATE TABLE IF NOT EXISTS model_performance_curves (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    evaluation_date DATE,
+    model_version VARCHAR(50),
+    curve_type VARCHAR(30),   -- 'roc' or 'pr'
+    class_label VARCHAR(20),
+    data JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_eval (evaluation_date)
+);
+
+-- Explanation feedback (XAI refinement loop)
+CREATE TABLE IF NOT EXISTS explanation_feedback (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    contract_code VARCHAR(50),
+    prediction_date TIMESTAMP NULL,
+    helpful BOOLEAN,
+    rating TINYINT NULL,
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX idx_contract (contract_code)
+);
+
+-- Automated model actions (retrain / investigate)
+CREATE TABLE IF NOT EXISTS model_actions (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    action_type VARCHAR(50),
+    trigger_reason TEXT,
+    status VARCHAR(20) DEFAULT 'pending',
+    detail JSON,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Drift reference baseline snapshot
+CREATE TABLE IF NOT EXISTS drift_reference (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    captured_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    sample_size INT,
+    feature_cols JSON,
+    reference_features JSON,
+    reference_predictions JSON
 );
 
 -- Model fairness / bias tracking

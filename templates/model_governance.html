@@ -2,22 +2,85 @@
 
 {% set title = "Model Governance" %}
 {% set page_title = "Model Governance" %}
-{% set page_description = "AI model performance and explainability" %}
+{% set page_description = "AI model performance, explainability & drift monitoring" %}
 {% set active_page = "model-governance" %}
 
 {% block content %}
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">Model Performance</h3>
-        <div id="performanceSummary" class="text-gray-500">Loading...</div>
-        <div class="mt-4">
-            <button id="refreshPerformance" class="px-3 py-2 bg-purple-600 text-white rounded-md">Refresh</button>
+<div class="space-y-6">
+
+    <!-- Action bar -->
+    <div class="bg-white rounded-lg shadow p-4 flex flex-wrap items-center gap-3">
+        <button id="btnEvaluate" class="px-3 py-2 bg-purple-600 text-white rounded-md text-sm">Evaluate Performance</button>
+        <button id="btnMonitor" class="px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">Run Monitoring Cycle</button>
+        <button id="btnDrift" class="px-3 py-2 bg-amber-600 text-white rounded-md text-sm">Run Drift Detection</button>
+        <button id="btnCaptureRef" class="px-3 py-2 bg-gray-600 text-white rounded-md text-sm">Capture Drift Baseline</button>
+        <span id="actionStatus" class="text-sm text-gray-500"></span>
+    </div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Performance summary -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4">Model Performance</h3>
+            <div id="performanceSummary" class="text-gray-500">Loading...</div>
+        </div>
+
+        <!-- Feedback summary -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4">Explanation Feedback</h3>
+            <div id="feedbackSummary" class="text-gray-500">Loading...</div>
+        </div>
+
+        <!-- Pending investigations -->
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4">Pending Investigations</h3>
+            <div id="pendingActions" class="text-gray-500">Loading...</div>
         </div>
     </div>
 
+    <!-- ROC & PR curves -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4">ROC Curve (NPL, one-vs-rest)</h3>
+            <canvas id="rocChart" height="220"></canvas>
+        </div>
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4">Precision-Recall Curve (NPL)</h3>
+            <canvas id="prChart" height="220"></canvas>
+        </div>
+    </div>
+
+    <!-- Confusion matrix + per-class metrics -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Confusion Matrix & Per-Class Metrics</h3>
+        <div id="confusionMatrix" class="text-gray-500">No evaluation data yet. Run "Evaluate Performance".</div>
+    </div>
+
+    <!-- SHAP explainability -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">SHAP Explainability</h3>
+        <div class="flex items-end gap-3 mb-4">
+            <div>
+                <label class="block text-xs text-gray-600 mb-1">Contract Code</label>
+                <input id="explainContract" type="text" placeholder="e.g. C000001"
+                       class="px-3 py-2 border rounded-md w-48" />
+            </div>
+            <button id="btnExplain" class="px-3 py-2 bg-purple-600 text-white rounded-md">Explain</button>
+            <span id="explainStatus" class="text-sm text-gray-500"></span>
+        </div>
+        <div id="explanationResult">
+            <p class="text-sm text-gray-500">Enter a contract code to generate a SHAP explanation.</p>
+        </div>
+    </div>
+
+    <!-- Drift detection -->
+    <div class="bg-white rounded-lg shadow p-6">
+        <h3 class="text-lg font-semibold mb-4">Data Drift (Kolmogorov-Smirnov)</h3>
+        <div id="driftResult" class="text-gray-500">Run "Run Drift Detection" to compare current data against the baseline.</div>
+    </div>
+
+    <!-- Fairness & Bias -->
     <div class="bg-white rounded-lg shadow p-6 col-span-2">
         <h3 class="text-lg font-semibold mb-4">Fairness & Bias Tracker</h3>
-
         <div class="flex items-center gap-4 mb-4">
             <label class="text-sm text-gray-700">Sensitive Attribute</label>
             <select id="sensitiveAttribute" class="px-3 py-2 border rounded-md">
@@ -29,7 +92,6 @@
             <button id="runFairness" class="px-3 py-2 bg-purple-600 text-white rounded-md">Run Fairness Check</button>
             <div id="fairnessSpinner" class="hidden text-sm text-gray-500">Running…</div>
         </div>
-
         <div id="fairnessResult">
             <table class="min-w-full divide-y divide-gray-200">
                 <thead class="bg-gray-50">
@@ -47,11 +109,13 @@
             </table>
         </div>
     </div>
-</div>
-<div class="p-6">
-    <div class="bg-white rounded-lg shadow p-6">
-        <h3 class="text-lg font-semibold mb-4">Feature Importance</h3>
-        <canvas id="featureImportanceChart" height="120"></canvas>
+
+    <!-- Feature importance -->
+    <div class="p-6">
+        <div class="bg-white rounded-lg shadow p-6">
+            <h3 class="text-lg font-semibold mb-4">Feature Importance</h3>
+            <canvas id="featureImportanceChart" height="120"></canvas>
+        </div>
     </div>
 </div>
 {% endblock %}
@@ -59,11 +123,43 @@
 {% block scripts %}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-    document.getElementById('runFairness').addEventListener('click', runFairnessCheck);
-    document.getElementById('refreshPerformance').addEventListener('click', loadPerformance);
+function bind(id, handler) {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('click', handler);
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    bind('runFairness', runFairnessCheck);
+    bind('btnEvaluate', () => postAction('/api/model-governance/evaluate', 'Evaluation complete'));
+    bind('btnMonitor', () => postAction('/api/model-governance/monitor', 'Monitoring cycle complete'));
+    bind('btnDrift', runDrift);
+    bind('btnCaptureRef', () => postAction('/api/model-governance/capture-reference', 'Drift baseline captured'));
+    bind('btnExplain', explainContract);
     loadPerformance();
+    loadFeedbackSummary();
+    loadPendingActions();
+    loadCurves();
 });
+
+function setStatus(msg) { document.getElementById('actionStatus').textContent = msg || ''; }
+
+async function postAction(url, okMsg) {
+    setStatus('Working...');
+    try {
+        const res = await fetch(url, { method: 'POST' });
+        const data = await res.json();
+        if (data && data.evaluated === false && data.reason) {
+            setStatus('Note: ' + data.reason);
+        } else if (data && data.error) {
+            setStatus('Error: ' + data.error);
+        } else {
+            setStatus(okMsg);
+        }
+        loadPerformance(); loadCurves(); loadPendingActions();
+    } catch (e) {
+        setStatus('Request failed');
+    }
+}
 
 async function loadPerformance() {
     const el = document.getElementById('performanceSummary');
@@ -71,14 +167,230 @@ async function loadPerformance() {
     try {
         const res = await fetch('/api/model-governance/dashboard');
         const data = await res.json();
-        const perf = data.performance_summary || {};
-        el.innerHTML = `
-            <div class="text-sm">Avg Accuracy: <strong>${(perf?.avg_accuracy||0).toFixed(4)}</strong></div>
-            <div class="text-sm">Avg F1: <strong>${(perf?.avg_f1_score||0).toFixed(4)}</strong></div>
-            <div class="text-sm">Evaluations: <strong>${perf?.evaluation_count||0}</strong></div>
-        `;
+            const perf = data.performance_summary || {};
+            const evaln = data.latest_evaluation || {};
+            const evals = perf && perf.evaluation_count ? perf.evaluation_count : 0;
+            if (evals === 0) {
+                el.innerHTML = '<div class="text-sm text-amber-700">No evaluations yet. Accuracy/F1/ROC need actual outcomes (customers.LOAN_STATUS). Load them via ETL, then run "Evaluate Performance".</div>';
+                return;
+            }
+            el.innerHTML = `
+                <div class="text-sm">Avg Accuracy: <strong>${(perf.avg_accuracy||0).toFixed(4)}</strong></div>
+                <div class="text-sm">Avg F1: <strong>${(perf.avg_f1_score||0).toFixed(4)}</strong></div>
+                <div class="text-sm">Avg Precision: <strong>${(perf.avg_precision||0).toFixed(4)}</strong></div>
+                <div class="text-sm">Avg ROC-AUC: <strong>${(perf.avg_auc_roc||0).toFixed(4)}</strong></div>
+                <div class="text-sm">Evaluations (30d): <strong>${evals}</strong></div>
+                ${evaln && evaln.npl_auc != null ? `<div class="text-sm mt-1">NPL ROC-AUC: <strong>${Number(evaln.npl_auc).toFixed(4)}</strong></div>` : ''}
+            `;
     } catch (e) {
         el.textContent = 'Failed to load performance';
+    }
+}
+
+async function loadFeedbackSummary() {
+    const el = document.getElementById('feedbackSummary');
+    try {
+        const res = await fetch('/api/model-governance/feedback-summary');
+        const d = await res.json();
+        const rate = ((d.helpful_rate||0)*100).toFixed(1);
+        el.innerHTML = `
+            <div class="text-sm">Helpful: <strong>${d.helpful||0}</strong></div>
+            <div class="text-sm">Not helpful: <strong>${d.not_helpful||0}</strong></div>
+            <div class="text-sm">Helpful rate (30d): <strong>${rate}%</strong></div>
+        `;
+    } catch (e) {
+        el.textContent = 'Failed to load feedback';
+    }
+}
+
+async function loadPendingActions() {
+    const el = document.getElementById('pendingActions');
+    try {
+        const res = await fetch('/api/model-governance/dashboard');
+        const data = await res.json();
+        const acts = data.pending_actions || [];
+        if (!acts.length) { el.innerHTML = '<div class="text-sm text-gray-500">No pending investigations.</div>'; return; }
+        el.innerHTML = acts.map(a => `
+            <div class="text-sm border-b py-2">
+                <span class="font-medium">${a.action_type}</span>
+                <span class="text-gray-500"> — ${a.status}</span>
+                <div class="text-xs text-gray-400">${new Date(a.created_at).toLocaleString()}</div>
+            </div>`).join('');
+    } catch (e) {
+        el.textContent = 'Failed to load investigations';
+    }
+}
+
+async function loadCurves() {
+    try {
+        const res = await fetch('/api/model-governance/curves');
+        const data = await res.json();
+        drawCurve('rocChart', data.roc?.data, 'FPR', 'TPR', 'ROC');
+        drawCurve('prChart', data.pr?.data, 'Recall', 'Precision', 'PR');
+        renderConfusion(data.latest_evaluation);
+    } catch (e) { console.error('curves', e); }
+}
+
+function drawCurve(canvasId, data, xlabel, ylabel, label) {
+    if (!data || !data[xlabel.toLowerCase()] || !data[ylabel.toLowerCase()]) return;
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const pts = data[xlabel.toLowerCase()].map((x, i) => ({ x: x, y: data[ylabel.toLowerCase()][i] }));
+    if (window['_'+canvasId]) window['_'+canvasId].destroy();
+    window['_'+canvasId] = new Chart(ctx, {
+        type: 'scatter',
+        data: { datasets: [{ label: label, data: pts, showLine: true, borderColor: 'rgba(124,58,237,0.8)', fill: false, pointRadius: 0 }] },
+        options: { scales: { x: { title: { display: true, text: xlabel }, min: 0, max: 1 }, y: { title: { display: true, text: ylabel }, min: 0, max: 1 } } }
+    });
+}
+
+function renderConfusion(evaln) {
+    const el = document.getElementById('confusionMatrix');
+    if (!evaln || !evaln.confusion_matrix) { return; }
+    const cm = evaln.confusion_matrix;
+    const labels = cm.labels;
+    let html = `<div class="mb-3 text-sm text-gray-600">Evaluated: ${evaln.evaluation_date}</div>`;
+    if (cm.matrix && labels) {
+        html += '<table class="min-w-full text-sm"><thead><tr><th></th>' +
+            labels.map(l => `<th class="px-3 py-1">${l}</th>`).join('') + '</tr></thead><tbody>';
+        cm.matrix.forEach((row, i) => {
+            html += `<tr><th class="px-3 py-1 text-left">${labels[i]}</th>` +
+                row.map(v => `<td class="px-3 py-1 text-center border">${v}</td>`).join('') + '</tr>';
+        });
+        html += '</tbody></table>';
+    }
+    if (evaln.per_class_metrics) {
+        html += '<div class="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">';
+        for (const [cls, m] of Object.entries(evaln.per_class_metrics)) {
+            if (typeof m !== 'object') continue;
+            html += `<div class="border rounded p-2">
+                <div class="font-medium">${cls}</div>
+                <div class="text-xs text-gray-600">P: ${(m.precision||0).toFixed(3)} | R: ${(m.recall||0).toFixed(3)} | F1: ${(m.f1_score||0).toFixed(3)}</div>
+            </div>`;
+        }
+        html += '</div>';
+    }
+    el.innerHTML = html;
+}
+
+async function explainContract() {
+    const code = document.getElementById('explainContract').value.trim();
+    const status = document.getElementById('explainStatus');
+    const result = document.getElementById('explanationResult');
+    if (!code) { status.textContent = 'Enter a contract code'; return; }
+    status.textContent = 'Explaining...';
+    try {
+        const res = await fetch('/api/model-governance/explain/' + encodeURIComponent(code));
+        const d = await res.json();
+        if (d.error) { result.innerHTML = `<p class="text-sm text-red-600">${d.error}</p>`; status.textContent=''; return; }
+        renderExplanation(d);
+        status.textContent = '';
+    } catch (e) {
+        result.innerHTML = '<p class="text-sm text-red-600">Explanation failed</p>';
+        status.textContent = '';
+    }
+}
+
+function renderExplanation(d) {
+    let html = `<div class="mb-3">
+        <span class="text-sm text-gray-600">Predicted:</span>
+        <strong class="text-purple-700">${d.predicted_status}</strong>
+        <span class="text-sm text-gray-600 ml-3">NPL prob:</span> <strong>${(d.npl_probability||0).toFixed(4)}</strong>
+    </div>`;
+
+    // Class probabilities
+    const cp = d.class_probabilities || {};
+    html += '<div class="mb-4">';
+    for (const [cls, p] of Object.entries(cp)) {
+        const pct = (p*100).toFixed(1);
+        html += `<div class="flex items-center gap-2 text-sm mb-1">
+            <span class="w-16">${cls}</span>
+            <div class="flex-1 bg-gray-100 rounded h-3"><div class="bg-purple-600 h-3 rounded" style="width:${pct}%"></div></div>
+            <span class="w-14 text-right">${pct}%</span>
+        </div>`;
+    }
+    html += '</div>';
+
+    // Top contributing features (waterfall-style bars)
+    const top = d.top_features || [];
+    html += '<div class="mb-2 font-medium text-sm">Top contributing features</div>';
+    html += '<div class="space-y-2">';
+    top.forEach(f => {
+        const v = f.shap_value;
+        const pct = Math.min(100, Math.abs(v)*100/ (Math.max(...top.map(x=>Math.abs(x.shap_value)))+1e-9)*100);
+        const color = v > 0 ? 'bg-red-500' : 'bg-blue-500';
+        const sign = v > 0 ? '+' : '';
+        html += `<div>
+            <div class="flex justify-between text-sm">
+                <span>${f.display_name || f.feature}</span>
+                <span class="text-gray-500">SHAP ${sign}${v.toFixed(4)}</span>
+            </div>
+            <div class="flex-1 bg-gray-100 rounded h-3">
+                <div class="${color} h-3 rounded" style="width:${pct}%"></div>
+            </div>
+        </div>`;
+    });
+    html += '</div>';
+
+    // Feedback widget
+    html += `<div class="mt-6 border-t pt-4">
+        <div class="text-sm font-medium mb-2">Was this explanation helpful?</div>
+        <div class="flex items-center gap-2">
+            <button id="fbYes" class="px-3 py-1 bg-green-600 text-white rounded">Yes</button>
+            <button id="fbNo" class="px-3 py-1 bg-red-600 text-white rounded">No</button>
+        </div>
+        <textarea id="fbComment" rows="2" placeholder="Optional comment..." class="mt-2 w-full border rounded p-2 text-sm"></textarea>
+        <div id="fbStatus" class="text-sm text-gray-500 mt-1"></div>
+    </div>`;
+
+    document.getElementById('explanationResult').innerHTML = html;
+
+    const code = document.getElementById('explainContract').value.trim();
+    document.getElementById('fbYes').addEventListener('click', () => submitFeedback(code, true));
+    document.getElementById('fbNo').addEventListener('click', () => submitFeedback(code, false));
+}
+
+async function submitFeedback(code, helpful) {
+    const comment = document.getElementById('fbComment').value;
+    const status = document.getElementById('fbStatus');
+    status.textContent = 'Submitting...';
+    try {
+        const fd = new FormData();
+        fd.append('contract_code', code);
+        fd.append('helpful', helpful ? 'true' : 'false');
+        fd.append('comment', comment);
+        await fetch('/api/model-governance/feedback', { method: 'POST', body: fd });
+        status.textContent = 'Thank you for your feedback!';
+        loadFeedbackSummary();
+    } catch (e) {
+        status.textContent = 'Feedback submit failed';
+    }
+}
+
+async function runDrift() {
+    const el = document.getElementById('driftResult');
+    el.textContent = 'Running drift detection...';
+    try {
+        const res = await fetch('/api/model-governance/detect-drift');
+        const d = await res.json();
+        if (d.baseline_captured) { el.innerHTML = `<p class="text-sm text-amber-700">${d.message}</p>`; return; }
+        if (d.error) { el.innerHTML = `<p class="text-sm text-red-600">${d.error}</p>`; return; }
+        const drifts = d.drift_results || {};
+        const entries = Object.entries(drifts).sort((a,b)=>b[1].drift_score-a[1].drift_score);
+        let html = `<div class="mb-2 text-sm">NPL prob drift: <strong>${(d.npl_drift_score||0).toFixed(3)}</strong> | Prediction drift: <strong>${(d.prediction_drift_score||0).toFixed(3)}</strong></div>`;
+        html += '<table class="min-w-full text-sm"><thead><tr><th class="px-3 py-1 text-left">Feature</th><th class="px-3 py-1">KS D</th><th class="px-3 py-1">p-value</th><th class="px-3 py-1">Severity</th></tr></thead><tbody>';
+        entries.forEach(([f, r]) => {
+            const badge = r.severity === 'high' ? 'bg-red-100 text-red-700' : r.severity === 'medium' ? 'bg-amber-100 text-amber-700' : 'bg-green-100 text-green-700';
+            html += `<tr class="border-b">
+                <td class="px-3 py-1">${f}</td>
+                <td class="px-3 py-1 text-center">${r.ks_statistic?.toFixed(4)}</td>
+                <td class="px-3 py-1 text-center">${r.p_value?.toFixed(4)}</td>
+                <td class="px-3 py-1 text-center"><span class="px-2 py-0.5 rounded text-xs ${badge}">${r.severity}</span></td>
+            </tr>`;
+        });
+        html += '</tbody></table>';
+        el.innerHTML = html;
+    } catch (e) {
+        el.textContent = 'Drift detection failed';
     }
 }
 
@@ -90,7 +402,6 @@ async function runFairnessCheck() {
         const res = await fetch(`/api/model-governance/fairness?sensitive_attribute=${encodeURIComponent(attr)}`);
         const data = await res.json();
         renderFairnessResults(data);
-        renderFairnessChart(data);
     } catch (e) {
         alert('Fairness check failed');
     } finally {
@@ -104,7 +415,6 @@ function renderFairnessResults(data) {
         tbody.innerHTML = '<tr><td colspan="5" class="p-4 text-sm text-gray-500">No results</td></tr>';
         return;
     }
-
     tbody.innerHTML = data.groups.map(g => `
         <tr>
             <td class="px-4 py-2 text-sm text-gray-900">${g.group_value}</td>
@@ -114,25 +424,6 @@ function renderFairnessResults(data) {
             <td class="px-4 py-2 text-sm text-gray-700">${g.disparate_impact===null? 'N/A' : g.disparate_impact.toFixed(4)}</td>
         </tr>
     `).join('');
-}
-
-// Render fairness selection-rate bar chart
-function renderFairnessChart(data) {
-    try {
-        const ctx = document.getElementById('featureImportanceChart');
-        if(!data || !data.groups) return;
-
-        // reuse featureImportanceChart for fairness if feature data not available
-        const labels = data.groups.map(g => g.group_value);
-        const values = data.groups.map(g => g.selection_rate || 0);
-
-        if(window._fairnessChart){ window._fairnessChart.destroy(); }
-        window._fairnessChart = new Chart(ctx.getContext('2d'), {
-            type: 'bar',
-            data: { labels: labels, datasets: [{ label: 'Selection Rate', data: values, backgroundColor: 'rgba(234,88,12,0.8)' }] },
-            options: { indexAxis: 'y', scales: { x: { beginAtZero: true } } }
-        });
-    } catch (e){ console.error('Failed to render fairness chart', e); }
 }
 </script>
 {% endblock %}
