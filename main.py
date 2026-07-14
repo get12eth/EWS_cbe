@@ -390,7 +390,7 @@ if os.path.exists(cal_file):
                 else:
                     CLASS_THRESHOLDS[_k] = float(_v)
             except Exception:
-                # skip invalid entries
+                #skip invalid entries
                 continue
         logger.info(f"Loaded calibrated thresholds from {cal_file}: {CLASS_THRESHOLDS}")
     except Exception as e:
@@ -588,7 +588,7 @@ async def get_kpis():
         cursor.execute('SELECT COUNT(*) FROM customers')
         total_portfolio = cursor.fetchone()[0] or 0
         
-        # Calculate dashboard metrics from real data
+        #Calculate dashboard metrics from real data
         total_customers = total_portfolio
         pas = status_counts.get('PAS', 0)
         set_count = status_counts.get('SET', 0)
@@ -1741,7 +1741,15 @@ async def create_customer(request: Request):
         cursor.close()
         conn.close()
         
-        return {'success': True, 'customer_id': customer_id, 'message': 'Customer created successfully'}
+        # Automatically score risk and populate alerts in real time (no human intervention)
+        prediction_result = None
+        try:
+            prediction_result = _run_customer_risk_prediction(customer_id)
+        except Exception as e:
+            logger.error(f"Auto risk prediction on customer create failed: {e}")
+        
+        return {'success': True, 'customer_id': customer_id,
+                'message': 'Customer created successfully', 'prediction': prediction_result}
         
     except Exception as e:
         logger.error(f"Failed to create customer: {e}")
@@ -1842,7 +1850,14 @@ async def update_customer(customer_id: int, request: Request):
         cursor.close()
         conn.close()
         
-        return {'success': True, 'message': 'Customer updated successfully'}
+        #Auto-run risk prediction on customer update
+        prediction_result = None
+        try:
+            prediction_result = _run_customer_risk_prediction(customer_id)
+        except Exception as e:
+            logger.error(f"Auto risk prediction on customer update failed: {e}")
+        
+        return {'success': True, 'message': 'Customer updated successfully', 'prediction': prediction_result}
         
     except Exception as e:
         logger.error(f"Failed to update customer: {e}")
@@ -1867,111 +1882,63 @@ async def delete_customer(customer_id: int):
         logger.error(f"Failed to delete customer: {e}")
         return {'success': False, 'error': str(e)}
 
-@app.post('/api/customers/{customer_id}/predict')
-async def predict_customer_risk(customer_id: int):
-    """Predict risk for a specific customer"""
+def _run_customer_risk_prediction(customer_id: int) -> Dict:
+    """Core risk prediction for a customer: load -> predict -> store -> SME alert.
+
+    Shared by the manual /predict endpoint and the automatic hooks on customer
+    create/update so risk is scored in real time without human intervention.
+    """
     try:
         conn = get_db_connection()
         cursor = conn.cursor(dictionary=True)
-        
         cursor.execute("SELECT * FROM customers WHERE id = %s", (customer_id,))
         customer = cursor.fetchone()
-        
-        if not customer:
-            return {'success': False, 'error': 'Customer not found'}
-        
         cursor.close()
         conn.close()
-        
-        #Prepare data for prediction
+        if not customer:
+            return {'success': False, 'error': 'Customer not found'}
+
+        # Derived features
         customer_data = pd.DataFrame([customer])
-        
-        #Calculate derived features
-        if 'GRANT_DATE' in customer_data.columns and 'EXPIRY_DATE' in customer_data.columns  and 'BUSINESS_DATE' in customer_data.columns:
+        if 'GRANT_DATE' in customer_data.columns and 'EXPIRY_DATE' in customer_data.columns and 'BUSINESS_DATE' in customer_data.columns:
             grant_date = pd.to_datetime(customer_data['GRANT_DATE'], errors='coerce')
             expiry_date = pd.to_datetime(customer_data['EXPIRY_DATE'], errors='coerce')
-            business_date = pd.to_datetime(customer_data['BUSINESS_DATE'], errors='coerce') 
-            
+            business_date = pd.to_datetime(customer_data['BUSINESS_DATE'], errors='coerce')
             customer_data['TOTAL_LOAN_DAYS'] = (expiry_date - grant_date).dt.days
-            customer_data['LOAN_AGE_DAYS'] = (business_date  - grant_date).dt.days
-           
-        
-        #Prepare model input
+            customer_data['LOAN_AGE_DAYS'] = (business_date - grant_date).dt.days
+
         X = prepare_model_input(customer_data)
-        
-        logger.info(f"Making prediction with input shape: {X.shape}")
-        #X is a numpy array, so we can't access .columns
-        #Use feature_cols for logging instead
-        logger.info(f"Input features: {list(feature_cols)}")
-        
+
         prediction = model.predict(X)[0]
         prediction_proba = model.predict_proba(X)[0]
-        
-        logger.info(f"Raw prediction: {prediction}")
-        logger.info(f"Raw prediction probabilities: {prediction_proba}")
-        logger.info(f"Prediction type: {type(prediction)}")
-        logger.info(f"Probability type: {type(prediction_proba)}")
-        
-        #Ensure float64 type for consistency
         if hasattr(prediction_proba, 'dtype') and prediction_proba.dtype == np.float32:
             prediction_proba = prediction_proba.astype(np.float64)
-        
-        #Get class labels
-        if hasattr(label_encoder, 'classes_'):
-            classes = label_encoder.classes_
-            pred_label = classes[prediction]
-            
-            logger.info(f"Available classes: {classes}")
-            logger.info(f"Prediction index: {prediction}")
-            logger.info(f"Prediction probabilities: {prediction_proba}")
-            
-            #Handle multiclass probability extraction
-            if len(classes) == 2:
-                #Binary case
-                npl_prob = prediction_proba[1]
-            else:
-                #Multiclass case - find NPL probability
-                npl_class_index = list(classes).index('NPL') if 'NPL' in classes else 0
-                npl_prob = prediction_proba[npl_class_index] if len(prediction_proba) > npl_class_index else 0.0
-        
-        #Determine risk level based on prediction
-        if pred_label == 'NPL':
-            risk_level = 'High Risk'
-        elif pred_label == 'SME':
-            risk_level = 'Medium Risk'
+
+        classes = label_encoder.classes_
+        pred_label = classes[prediction]
+        if len(classes) == 2:
+            npl_prob = prediction_proba[1]
         else:
-            risk_level = 'Low Risk'
-        
-        logger.info(f"Final prediction result: pred_label={pred_label}, npl_prob={npl_prob}, risk_level={risk_level}")
-        
-        #Create all class probabilities dictionary
+            npl_class_index = list(classes).index('NPL') if 'NPL' in classes else 0
+            npl_prob = prediction_proba[npl_class_index] if len(prediction_proba) > npl_class_index else 0.0
+
+        risk_level = 'High Risk' if pred_label == 'NPL' else ('Medium Risk' if pred_label == 'SME' else 'Low Risk')
+
         all_probabilities = {}
-        if hasattr(label_encoder, 'classes_'):
-            classes = label_encoder.classes_
-            for i, class_name in enumerate(classes):
-                if i < len(prediction_proba):
-                    all_probabilities[class_name] = round(float(prediction_proba[i]), 4)
-        else:
-            #Fallback for binary case
-            all_probabilities['PAS'] = round(float(prediction_proba[0]), 4) if len(prediction_proba) > 0 else 0.0
-            all_probabilities['NPL'] = round(float(prediction_proba[1]), 4) if len(prediction_proba) > 1 else 0.0
-        
-        logger.info(f"All class probabilities: {all_probabilities}")
-        
-        #Store prediction results in prediction_results table
+        for i, class_name in enumerate(classes):
+            if i < len(prediction_proba):
+                all_probabilities[class_name] = round(float(prediction_proba[i]), 4)
+
+        # Store prediction results
         conn = get_db_connection()
         cursor = conn.cursor()
-        
-        #Insert prediction results
-        insert_sql = """
-        INSERT INTO prediction_results (
-            customer_id, contract_code, predicted_status, npl_probability,
-            pas_probability, sme_probability, set_probability, risk_level,
-            model_version, feature_count
-        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-        """
-        
-        insert_params = (
+        cursor.execute("""
+            INSERT INTO prediction_results (
+                customer_id, contract_code, predicted_status, npl_probability,
+                pas_probability, sme_probability, set_probability, risk_level,
+                model_version, feature_count
+            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (
             customer_id,
             customer.get('CONTRACT_CODE'),
             pred_label,
@@ -1982,50 +1949,101 @@ async def predict_customer_risk(customer_id: int):
             risk_level,
             'v1.0',
             31
-        )
-        
-        cursor.execute(insert_sql, insert_params)
+        ))
         conn.commit()
-        logger.info(f"Prediction results stored in prediction_results table")
+        cursor.close()
+        conn.close()
+
+        # Automatically raise an SME alert when predicted SME
+        if pred_label == 'SME' and alerts_engine:
+            try:
+                cust_pred = dict(customer)
+                cust_pred['PREDICTED_STATUS'] = pred_label
+                for alert_data in alerts_engine.evaluate_alert_conditions(cust_pred):
+                    res = alerts_engine.create_alert(alert_data)
+                    if not res.get('success'):
+                        logger.error(f"Failed to create SME alert: {res.get('error')}")
+            except Exception as e:
+                logger.error(f"Failed to generate SME alert: {e}")
+
+        return {
+            'success': True,
+            'prediction': pred_label,
+            'npl_probability': round(float(npl_prob), 4),
+            'all_probabilities': all_probabilities,
+            'risk_level': risk_level
+        }
+    except Exception as e:
+        logger.error(f"Failed to predict customer risk: {e}")
+        return {'success': False, 'error': str(e)}
+
+
+@app.post('/api/customers/{customer_id}/predict')
+async def predict_customer_risk(customer_id: int):
+    """Predict risk for a specific customer (manual trigger)."""
+    return _run_customer_risk_prediction(customer_id)
+
+@app.put('/api/customers/{customer_id}')
+async def update_customer(customer_id: int, request: Request):
+    """Update a customer"""
+    try:
+        data = await request.json()
+        
+        # Debug: Log received data
+        logger.info(f"Customer update {customer_id} - Received data keys: {list(data.keys())}")
+        logger.info(f"Customer update {customer_id} - Received data sample: {dict(list(data.items())[:5])}")
+        
+        conn = get_db_connection()
+        cursor = conn.cursor()
+        
+        #Build dynamic update query
+        update_fields = []
+        values = []
+        
+        # All possible database fields that can be updated (simplified schema)
+        all_fields = [
+            'DISTRICTNAME', 'CBE_REGION', 'BRANCHNAME', 'APPROVED_AMOUNT', 
+            'GRANT_DATE', 'EXPIRY_DATE', 'TENURE', 'TERM', 'LOAN_TYPE', 
+            'LOAN_DESCRIPTION', 'LOAN_PRODUCT', 'BUSINESS_DATE', 'PRINCIPAL_OS', 
+            'INTEREST_OS', 'PRINCIPAL_ARREARS', 'CURRENT_COMMITTMENT', 
+            'INSTALLMENT_AMOUNT', 'ECONOMIC_SECTOR', 'INDUSTRY', 'OWNERSHIP', 
+            'SECTOR', 'TERM_OF_PAYMENT', 'PRODUCT_OWNER', 'LTYPE', 'COLLATERAL_VALUE'
+        ]
+        
+        for field in all_fields:
+            if field in data:
+                update_fields.append(f"{field} = %s")
+                values.append(data[field])
+        
+        #Debug: Log which fields are being updated
+        logger.info(f"Customer update {customer_id} - Fields to update: {update_fields}")
+        logger.info(f"Customer update {customer_id} - Number of fields: {len(update_fields)}")
+        
+        if update_fields:
+            sql = f"""
+            UPDATE customers 
+            SET {', '.join(update_fields)}, UPDATED_AT = NOW()
+            WHERE id = %s
+            """
+            values.append(customer_id)
+            
+            cursor.execute(sql, values)
+            conn.commit()
         
         cursor.close()
         conn.close()
         
-        #Generate SME alert if prediction is SME
-        if pred_label == 'SME' and alerts_engine:
-            try:
-                logger.info(f"Generating SME alert for customer {customer_id}")
-                #Prepare customer data for alert evaluation
-                customer_with_prediction = customer.copy()
-                customer_with_prediction['PREDICTED_STATUS'] = pred_label
-                
-                #Evaluate alert conditions
-                triggered_alerts = alerts_engine.evaluate_alert_conditions(customer_with_prediction)
-                
-                #Create alerts for triggered conditions
-                for alert_data in triggered_alerts:
-                    alert_result = alerts_engine.create_alert(alert_data)
-                    if alert_result.get('success'):
-                        logger.info(f"SME alert created: {alert_result.get('alert_id')}")
-                    else:
-                        logger.error(f"Failed to create SME alert: {alert_result.get('error')}")
-                        
-            except Exception as e:
-                logger.error(f"Failed to generate SME alert: {e}")
+        #Auto-run risk prediction on customer update
+        prediction_result = None
+        try:
+            prediction_result = _run_customer_risk_prediction(customer_id)
+        except Exception as e:
+            logger.error(f"Auto risk prediction on customer update failed: {e}")
         
-        result = {
-            'success': True,
-            'prediction': pred_label,
-            'npl_probability': round(npl_prob, 4),
-            'all_probabilities': all_probabilities,
-            'risk_level': risk_level
-        }
-        
-        logger.info(f"Returning prediction result: {result}")
-        return result
+        return {'success': True, 'message': 'Customer updated successfully', 'prediction': prediction_result}
         
     except Exception as e:
-        logger.error(f"Failed to predict customer risk: {e}")
+        logger.error(f"Failed to update customer: {e}")
         return {'success': False, 'error': str(e)}
 
 @app.post('/api/alerts/{alert_id}/acknowledge')
