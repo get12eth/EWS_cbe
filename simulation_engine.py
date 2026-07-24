@@ -13,7 +13,7 @@ import pandas as pd
 import uuid
 from scipy import stats
 
-# Configure logging
+#Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -91,7 +91,7 @@ class SimulationEngine:
             cursor.execute("UPDATE simulation_scenarios SET status = 'running' WHERE scenario_id = %s", (scenario_id,))
             conn.commit()
             
-            # Get current portfolio data
+            #Get current portfolio data
             portfolio_data = self._get_current_portfolio()
             
             if not portfolio_data:
@@ -180,28 +180,28 @@ class SimulationEngine:
         """Apply economic shocks to portfolio"""
         shocked_portfolio = portfolio.copy()
         
-        # Extract scenario parameters
+        #Extract scenario parameters
         inflation_rate = scenario.get('inflation_rate', 0.0) / 100
         interest_rate_change = scenario.get('interest_rate_change', 0.0) / 100
         gdp_growth = scenario.get('gdp_growth', 0.0) / 100
         unemployment_rate = scenario.get('unemployment_rate', 0.0) / 100
         
-        # Apply macroeconomic adjustments to NPL probabilities
+        #Apply macroeconomic adjustments to NPL probabilities
         base_npl_prob = shocked_portfolio['NPL_PROBABILITY'].copy()
         
-        # Inflation impact (higher inflation may increase NPL risk)
+        #Inflation impact (higher inflation may increase NPL risk)
         inflation_impact = 1 + (inflation_rate * 0.5)  # Moderate sensitivity
         
-        # Interest rate impact (higher rates increase default risk)
+        #Interest rate impact (higher rates increase default risk)
         interest_impact = 1 + (interest_rate_change * 1.2)  # High sensitivity
         
-        # GDP growth impact (negative GDP increases risk)
+        #GDP growth impact (negative GDP increases risk)
         gdp_impact = 1 - (gdp_growth * 0.8)  # Negative correlation
         
         # Unemployment impact (higher unemployment increases risk)
         unemployment_impact = 1 + (unemployment_rate * 1.5)  # High sensitivity
         
-        # Combined impact
+        #Combined impact
         combined_impact = inflation_impact * interest_impact * gdp_impact * unemployment_impact
         
         # Apply to NPL probabilities with bounds
@@ -221,11 +221,11 @@ class SimulationEngine:
         """Calculate sector-specific impacts"""
         sector_results = []
         
-        # Get scenario parameters
+        #Get scenario parameters
         sector_exclusions = json.loads(scenario.get('sector_exclusions', '[]'))
         sector_increments = json.loads(scenario.get('sector_increments', '[]'))
         
-        # Group by sector
+        #Group by sector
         sector_groups = portfolio.groupby('ECONOMIC_SECTOR')
         
         for sector_name, sector_data in sector_groups:
@@ -233,28 +233,28 @@ class SimulationEngine:
             if sector_name in sector_exclusions:
                 continue
             
-            # Apply sector increments
+            #Apply sector increments
             sector_multiplier = 1.0
             for increment in sector_increments:
                 if increment.get('sector') == sector_name:
                     sector_multiplier = 1 + (increment.get('increase_percentage', 0) / 100)
                     break
             
-            # Calculate baseline metrics
+            #Calculate baseline metrics
             baseline_loan_count = len(sector_data)
             baseline_portfolio_value = sector_data['PRINCIPAL_OS'].sum()
             baseline_npl_count = (sector_data['PREDICTED_STATUS'] == 'NPL').sum()
             baseline_npl_rate = baseline_npl_count / baseline_loan_count if baseline_loan_count > 0 else 0
             
-            # Calculate simulated metrics
+            #Calculate simulated metrics
             simulated_loan_count = int(baseline_loan_count * sector_multiplier)
             simulated_portfolio_value = baseline_portfolio_value * sector_multiplier
             
-            # Use shocked probabilities for simulation
+            #Use shocked probabilities for simulation
             simulated_npl_count = (sector_data['shocked_predicted_status'] == 'NPL').sum()
             simulated_npl_rate = simulated_npl_count / simulated_loan_count if simulated_loan_count > 0 else 0
             
-            # Calculate impacts
+            #Calculate impacts
             npl_change = simulated_npl_count - baseline_npl_count
             npl_rate_change = simulated_npl_rate - baseline_npl_rate
             portfolio_value_change = simulated_portfolio_value - baseline_portfolio_value
@@ -329,7 +329,7 @@ class SimulationEngine:
         cursor = conn.cursor()
         
         try:
-            # Store sector results
+            #Store sector results
             sql = """
                 INSERT INTO simulation_sector_results 
                 (scenario_id, economic_sector, baseline_loan_count, baseline_portfolio_value,
@@ -378,7 +378,7 @@ class SimulationEngine:
             if not scenario:
                 return None
             
-            # Get sector results
+            #Get sector results
             cursor.execute("""
                 SELECT * FROM simulation_sector_results 
                 WHERE scenario_id = %s 
@@ -568,7 +568,7 @@ class SimulationEngine:
         
         return created_scenarios
 
-# Example usage
+#Example usage
 if __name__ == "__main__":
     # Database configuration
     db_config = {
@@ -578,10 +578,10 @@ if __name__ == "__main__":
         'database': 'lon-default'
     }
     
-    # Initialize Simulation Engine
+    #Initialize Simulation Engine
     sim_engine = SimulationEngine(db_config)
     
-    # Create a stress test scenario
+    #Create a stress test scenario
     scenario_data = {
         'scenario_name': 'COVID-19 Impact',
         'description': 'Simulate pandemic economic impact',
@@ -597,7 +597,7 @@ if __name__ == "__main__":
         'created_by': 'admin'
     }
     
-    # result = sim_engine.create_simulation_scenario(scenario_data)
-    # if result['success']:
-    #     sim_result = sim_engine.run_simulation(result['scenario_id'])
-    #     print(sim_result)
+    #result = sim_engine.create_simulation_scenario(scenario_data)
+    #if result['success']:
+    #sim_result = sim_engine.run_simulation(result['scenario_id'])
+    #print(sim_result)

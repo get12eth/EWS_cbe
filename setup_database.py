@@ -10,7 +10,7 @@ import os
 def execute_sql_schema():
     """Execute the comprehensive SQL schema"""
     
-    # Database configuration
+    #Database configuration
     db_config = {
         'host': 'localhost',
         'user': 'root',
@@ -18,7 +18,7 @@ def execute_sql_schema():
         'database': 'lon-default'
     }
     
-    # Read the SQL file
+    #Read the SQL file
     sql_file_path = os.path.join(os.path.dirname(__file__), 'sql', 'comprehensive_schema.sql')
     
     try:
@@ -34,11 +34,11 @@ def execute_sql_schema():
         
         cursor = conn.cursor()
         
-        # Create database if it doesn't exist
+        #Create database if it doesn't exist
         cursor.execute("CREATE DATABASE IF NOT EXISTS `lon-default`")
         cursor.execute("USE `lon-default`")
         
-        # Split SQL content into individual statements
+        #Split SQL content into individual statements
         statements = [stmt.strip() for stmt in sql_content.split(';') if stmt.strip()]
         
         print(f"Executing {len(statements)} SQL statements...")
@@ -55,7 +55,7 @@ def execute_sql_schema():
         conn.commit()
         print("Database schema created successfully!")
         
-        # Verify tables were created
+        #Verify tables were created
         cursor.execute("SHOW TABLES")
         tables = cursor.fetchall()
         print(f"\nCreated {len(tables)} tables:")

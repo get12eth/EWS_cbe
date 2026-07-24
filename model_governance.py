@@ -23,7 +23,7 @@ import joblib
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Human-readable metadata for model features used in explanations.
+#Human-readable metadata for model features used in explanations.
 FEATURE_DISPLAY_NAMES = {
     'PRINCIPAL_OS': ('Principal Outstanding', 'Remaining principal balance on the loan'),
     'INTEREST_OS': ('Interest Outstanding', 'Unpaid interest accrued'),
@@ -48,7 +48,7 @@ FEATURE_DISPLAY_NAMES = {
     'RISK_GRADE': ('Risk Grade', 'Internal risk rating'),
 }
 
-# Drift detection thresholds (Kolmogorov-Smirnov D statistic)
+#Drift detection thresholds (Kolmogorov-Smirnov D statistic)
 DRIFT_D_MEDIUM = 0.10
 DRIFT_D_HIGH = 0.20
 DRIFT_P_VALUE = 0.05
@@ -235,7 +235,7 @@ class ModelGovernance:
                 'f1_score': float(f1_score(actuals, predictions, average='weighted', zero_division=0))
             }
 
-            # Calculate AUC-ROC if probabilities are provided
+            #Calculate AUC-ROC if probabilities are provided
             if probabilities and len(set(actuals)) == 2:  # Binary classification
                 try:
                     metrics['auc_roc'] = float(roc_auc_score(actuals, probabilities))
@@ -244,7 +244,7 @@ class ModelGovernance:
             else:
                 metrics['auc_roc'] = 0.0
             
-            # Calculate confusion matrix components
+            #Calculate confusion matrix components
             unique_labels = list(set(actuals + predictions))
             for label in unique_labels:
                 tp = sum(1 for a, p in zip(actuals, predictions) if a == label and p == label)

@@ -175,7 +175,7 @@ class AlertsEngine:
                         except Exception:
                             continue
 
-                # If a numeric threshold is provided, compare using operator; otherwise fall back to status check
+                #If a numeric threshold is provided, compare using operator; otherwise fall back to status check
                 if sme_prob is not None and isinstance(threshold, (int, float)):
                     current_value = sme_prob
                     triggered = self._compare_values(current_value, float(threshold), operator)
@@ -274,16 +274,43 @@ class AlertsEngine:
         try:
             contract_code = alert_data.get('contract_code', '')
             rule_id = alert_data.get('rule_id', None)
+            new_severity = alert_data.get('severity', 'medium')
+            new_title = alert_data.get('title', '') or alert_data.get('risk_signal', '') or ''
             
             # Check if alert already exists for this contract and rule (in active status)
             existing_alert = None
+            skip_creation = False
+            
             if contract_code and rule_id:
                 cursor.execute("""
-                    SELECT alert_id, id FROM alerts 
+                    SELECT alert_id, id, severity, title FROM alerts 
                     WHERE contract_code = %s AND rule_id = %s AND status IN ('open', 'acknowledged')
                     LIMIT 1
                 """, (contract_code, rule_id))
                 existing_alert = cursor.fetchone()
+            
+            # If no exact rule match, check for related SME alerts on the same contract
+            # (e.g., multiple SME rules creating duplicate alerts for the same customer)
+            if not existing_alert and contract_code and 'SME' in new_title.upper():
+                cursor.execute("""
+                    SELECT alert_id, id, severity, title FROM alerts 
+                    WHERE contract_code = %s 
+                      AND status IN ('open', 'acknowledged')
+                      AND UPPER(title) LIKE %s
+                    LIMIT 1
+                """, (contract_code, '%SME%'))
+                related = cursor.fetchone()
+                if related:
+                    sev_order = {'critical': 0, 'high': 1, 'medium': 2, 'low': 3}
+                    existing_sev = related.get('severity', 'low')
+                    if sev_order.get(new_severity, 99) > sev_order.get(existing_sev, 99):
+                        existing_alert = related
+                    else:
+                        existing_alert = related
+                        skip_creation = True
+            
+            if skip_creation:
+                return {'success': True, 'alert_id': existing_alert['alert_id'], 'action': 'skipped'}
             
             if existing_alert:
                 # UPDATE existing alert
@@ -305,6 +332,19 @@ class AlertsEngine:
                 ))
                 conn.commit()
                 logger.info(f"Updated existing alert: {uid} for contract {contract_code}")
+                
+                # Close any other open/acknowledged SME alerts for the same contract
+                # so only the highest-severity one remains active
+                cursor.execute("""
+                    UPDATE alerts 
+                    SET status = 'resolved', resolved_at = NOW(), resolution_notes = %s
+                    WHERE contract_code = %s 
+                      AND alert_id != %s 
+                      AND status IN ('open', 'acknowledged')
+                      AND UPPER(title) LIKE %s
+                """, ('Superseded by higher severity alert', contract_code, uid, '%SME%'))
+                conn.commit()
+                
                 action = 'updated'
             else:
                 # INSERT new alert
@@ -334,7 +374,7 @@ class AlertsEngine:
                 logger.info(f"Created new alert: {uid} for contract {contract_code}")
                 action = 'created'
             
-            # Send notifications using the varchar alert id
+            #Send notifications using the varchar alert id
             self._send_notifications(uid, alert_data)
             
             return {'success': True, 'alert_id': uid, 'action': action}
@@ -569,7 +609,7 @@ class AlertsEngine:
                 threshold = rule['threshold_value']
                 operator = rule['operator']
 
-                # Build base query joining latest prediction results and customers
+                #Build base query joining latest prediction results and customers
                 sql = f"""
                     SELECT pr.*, c.CONTRACT_CODE, c.BRANCHNAME
                     FROM prediction_results pr
@@ -608,7 +648,7 @@ class AlertsEngine:
                                 skipped += 1
                                 continue
 
-                            # Ensure alert payload contains rule_id and contract_code
+                            #Ensure alert payload contains rule_id and contract_code
                             alert['rule_id'] = rule['id']
                             alert['contract_code'] = p.get('CONTRACT_CODE') or p.get('contract_code')
                             alert['branch_name'] = p.get('BRANCHNAME') or p.get('branch_name')
@@ -695,12 +735,18 @@ class AlertsEngine:
 
                     contract_code = p.get('CONTRACT_CODE') or p.get('contract_code')
 
-                    # Avoid duplicates: same contract with open/acknowledged SME alert
+                    # Avoid duplicates: if any open/acknowledged SME-related alert already exists for this contract,
+                    # update it instead of inserting a new one.
                     chk = conn.cursor()
                     try:
-                        # Use `title` match to detect duplicates since rule_id column may not be populated
-                        title = f"SME Prediction Alert - {contract_code}"
-                        chk.execute("SELECT id, alert_id FROM alerts WHERE contract_code = %s AND title = %s AND status IN ('open','acknowledged') LIMIT 1", (contract_code, title))
+                        chk.execute("""
+                            SELECT id, alert_id, title, severity
+                            FROM alerts
+                            WHERE contract_code = %s
+                              AND status IN ('open','acknowledged')
+                              AND title LIKE %s
+                            LIMIT 1
+                        """, (contract_code, '%SME%'))
                         exists = chk.fetchone()
                     finally:
                         chk.close()
@@ -711,7 +757,7 @@ class AlertsEngine:
                         'contract_code': contract_code,
                         'branch_name': p.get('BRANCHNAME') or p.get('branch_name'),
                         'severity': 'medium',
-                        'title': f"SME prediction alert - {contract_code}",
+                        'title': f"SME Prediction Alert - {contract_code}",
                         'description': f"SME probability {sme_prob:.4f} >= {threshold}",
                         'current_value': sme_prob,
                         'threshold_value': threshold,

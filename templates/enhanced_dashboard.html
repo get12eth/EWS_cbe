@@ -13,12 +13,12 @@
             transition: all 0.3s ease;
         }
         .sidebar-item:hover {
-            background-color: rgba(59, 130, 246, 0.1);
-            border-left: 4px solid #3b82f6;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-left: 4px solid #a78bfa;
         }
         .sidebar-item.active {
-            background-color: rgba(59, 130, 246, 0.1);
-            border-left: 4px solid #3b82f6;
+            background-color: rgba(255, 255, 255, 0.1);
+            border-left: 4px solid #a78bfa;
         }
         .module-card {
             transition: transform 0.2s ease;
@@ -45,13 +45,13 @@
 <body class="bg-gray-50">
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <div class="w-64 bg-white shadow-lg">
-            <div class="p-4 border-b">
+        <div class="w-64 bg-gradient-to-b from-purple-900 to-purple-700 shadow-lg text-white">
+            <div class="p-4 border-b border-purple-800">
                 <div class="flex items-center space-x-3">
                     <img src="/static/image/cbe_l.jpg" alt="CBE Logo" class="w-10 h-10 rounded-lg object-cover">
                     <div>
-                        <h1 class="text-lg font-bold text-gray-900">CBE Risk</h1>
-                        <p class="text-xs text-gray-500">Loan Management System</p>
+                        <h1 class="text-lg font-bold text-white">CBE Risk</h1>
+                        <p class="text-xs text-purple-200">Loan Management System</p>
                     </div>
                 </div>
             </div>
@@ -60,8 +60,8 @@
                 <div class="space-y-6">
                     <!-- Main Dashboard -->
                     <div>
-                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Main</h3>
-                        <a href="/dashboard" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                        <h3 class="text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2">Main</h3>
+                        <a href="/dashboard" class="sidebar-item flex items-center space-x-3 text-white p-2 rounded-lg">
                             <i data-lucide="layout-dashboard" class="w-5 h-5"></i>
                             <span>Dashboard</span>
                         </a>
@@ -69,29 +69,29 @@
                     
                     <!-- Risk Management -->
                     <div>
-                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Risk Management</h3>
+                        <h3 class="text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2">Risk Management</h3>
                         <div class="space-y-1">
-                            <a href="/customers" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/customers" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="users" class="w-5 h-5"></i>
                                 <span>Customers</span>
                             </a>
                             {% if get_user_role(request) == 'dao' %}
-                            <a href="/dao/cases" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/dao/cases" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="shield-check" class="w-5 h-5"></i>
                                 <span>DAO Cases</span>
                             </a>
                             {% endif %}
                             {% if get_user_role(request) != 'dao' %}
-                            <a href="/predict" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/predict" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="brain" class="w-5 h-5"></i>
                                 <span>Predict Risk</span>
                             </a>
-                            <a href="/alerts" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/alerts" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="bell" class="w-5 h-5"></i>
                                 <span>Alerts</span>
                                 <span id="alertsBadge" class="ml-auto bg-red-500 text-white text-xs px-2 py-1 rounded-full status-badge hidden">0</span>
                             </a>
-                            <a href="/cases" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/cases" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="folder-open" class="w-5 h-5"></i>
                                 <span>Cases</span>
                             </a>
@@ -101,17 +101,17 @@
                     {% if get_user_role(request) != 'dao' %}
                     <!-- Data & Analytics -->
                     <div>
-                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Data & Analytics</h3>
+                        <h3 class="text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2">Data & Analytics</h3>
                         <div class="space-y-1">
-                            <a href="/etl" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/etl" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="database" class="w-5 h-5"></i>
                                 <span>ETL Engine</span>
                             </a>
-                            <a href="/model-governance" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/model-governance" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="settings" class="w-5 h-5"></i>
                                 <span>Model Governance</span>
                             </a>
-                            <a href="/simulation" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/simulation" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="trending-up" class="w-5 h-5"></i>
                                 <span>Simulations</span>
                             </a>
@@ -120,13 +120,13 @@
                     
                     <!-- Reports -->
                     <div>
-                        <h3 class="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">Reports</h3>
+                        <h3 class="text-xs font-semibold text-purple-300 uppercase tracking-wider mb-2">Reports</h3>
                         <div class="space-y-1">
-                            <a href="/reports/portfolio" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/reports/portfolio" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="pie-chart" class="w-5 h-5"></i>
                                 <span>Portfolio</span>
                             </a>
-                            <a href="/reports/compliance" class="sidebar-item flex items-center space-x-3 text-gray-700 p-2 rounded-lg">
+                            <a href="/reports/compliance" class="sidebar-item flex items-center space-x-3 text-purple-100 p-2 rounded-lg">
                                 <i data-lucide="file-check" class="w-5 h-5"></i>
                                 <span>Compliance</span>
                             </a>
@@ -137,14 +137,14 @@
             </nav>
             
             <!-- User Section -->
-            <div class="absolute bottom-0 left-0 right-0 p-4 border-t">
+            <div class="absolute bottom-0 left-0 right-0 p-4 border-t border-purple-800">
                 <div class="flex items-center space-x-3">
-                    <div class="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-                        <i data-lucide="user" class="w-4 h-4 text-gray-600"></i>
+                    <div class="w-8 h-8 bg-purple-600 rounded-full flex items-center justify-center">
+                        <i data-lucide="user" class="w-4 h-4 text-white"></i>
                     </div>
                     <div class="flex-1">
-                        <p class="text-sm font-medium text-gray-900">{{ user }}</p>
-                        <p class="text-xs text-gray-500">Administrator</p>
+                        <p class="text-sm font-medium text-white">{{ user }}</p>
+                        <p class="text-xs text-purple-200">Administrator</p>
                     </div>
                 </div>
             </div>

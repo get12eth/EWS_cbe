@@ -142,8 +142,8 @@ except Exception as e:
     model_governance = None
     simulation_engine = None
 
-# Wire model-governance drift investigations to the alerts engine so that
-# significant drift raises an operational alert automatically.
+#Wire model-governance drift investigations to the alerts engine so that
+#significant drift raises an operational alert automatically.
 if model_governance and alerts_engine:
     try:
         def _governance_alert_callback(title, context):
@@ -200,7 +200,7 @@ async def login_submit(request: Request, username: str = Form(...), password: st
                     request.session['user'] = username
                     return RedirectResponse('/dashboard', status_code=302)
 
-        # Fallback: allow local admin/admin for emergency access
+        #Fallback: allow local admin/admin for emergency access
         if username == 'admin' and password == 'admin':
             request.session['user'] = username
             return RedirectResponse('/dashboard', status_code=302)
@@ -584,7 +584,7 @@ async def get_kpis():
         ''')
         status_counts = dict(cursor.fetchall())
 
-        # Total portfolio should reflect unique customers in the system
+        #Total portfolio should reflect unique customers in the system
         cursor.execute('SELECT COUNT(*) FROM customers')
         total_portfolio = cursor.fetchone()[0] or 0
         
@@ -601,7 +601,7 @@ async def get_kpis():
         #Risk Alerts = Total NPL and SME customers
         risk_alerts = npl + sme
         
-        # Calculate realistic change percentages based on actual data
+        #Calculate realistic change percentages based on actual data
         active_loans_change = round((active_loans / max(total_customers, 1)) * 100, 1) if total_customers > 0 else 0
         risk_alerts_change = round((risk_alerts / max(total_customers, 1)) * 100, 1) if total_customers > 0 else 0
         
@@ -665,7 +665,7 @@ async def get_risk_distribution():
         if not results:
             return {'regions': []}
         
-        # Process results into the expected format
+        #Process results into the expected format
         region_data = {}
         for region, status, count in results:
             if region not in region_data:
@@ -676,7 +676,7 @@ async def get_risk_distribution():
             elif status == 'SME':
                 region_data[region]['sme'] = count
         
-        # Convert to chart data format
+        #Convert to chart data format
         regions = []
         for region, data in region_data.items():
             total = data['npl'] + data['sme']
@@ -711,7 +711,7 @@ async def get_portfolio_overview():
         
         cursor = conn.cursor()
         
-        # Use latest contract prediction to build the portfolio overview
+        #Use latest contract prediction to build the portfolio overview
         cursor.execute('''
             SELECT p.predicted_status, COUNT(*) as count 
             FROM prediction_results p
@@ -876,7 +876,6 @@ async def sector_exposure():
     rows = [{'sector': r['ECONOMIC_SECTOR'], 'sum_principal': int(r['PRINCIPAL_OS']), 'count': int(r['CONTRACT_CODE'])} for _, r in grouped.iterrows()]
     return {'sectors': rows}
 
-
 @app.get('/api/status_distribution')
 async def status_distribution():
     df = get_prediction_df()
@@ -1021,12 +1020,11 @@ async def predict(
     #Ensure explanation variable always exists to avoid UnboundLocalError later
     explanation = None
 
+
     #=== Feature Engineering ===
     total_loan_days = (expiry_dt - grant_dt).days
     loan_age_days = (business_dt - grant_dt).days
-
-
-    #Build input DataFrame
+#Build input DataFrame
     data = pd.DataFrame([{
         "DISTRICTNAME": DISTRICTNAME,
         "CBE_REGION": CBE_REGION,
@@ -1898,7 +1896,7 @@ def _run_customer_risk_prediction(customer_id: int) -> Dict:
         if not customer:
             return {'success': False, 'error': 'Customer not found'}
 
-        # Derived features
+        #Derived features
         customer_data = pd.DataFrame([customer])
         if 'GRANT_DATE' in customer_data.columns and 'EXPIRY_DATE' in customer_data.columns and 'BUSINESS_DATE' in customer_data.columns:
             grant_date = pd.to_datetime(customer_data['GRANT_DATE'], errors='coerce')
@@ -1929,7 +1927,7 @@ def _run_customer_risk_prediction(customer_id: int) -> Dict:
             if i < len(prediction_proba):
                 all_probabilities[class_name] = round(float(prediction_proba[i]), 4)
 
-        # Store prediction results
+        #Store prediction results
         conn = get_db_connection()
         cursor = conn.cursor()
         cursor.execute("""
@@ -2000,7 +1998,7 @@ async def update_customer(customer_id: int, request: Request):
         update_fields = []
         values = []
         
-        # All possible database fields that can be updated (simplified schema)
+        #All possible database fields that can be updated (simplified schema)
         all_fields = [
             'DISTRICTNAME', 'CBE_REGION', 'BRANCHNAME', 'APPROVED_AMOUNT', 
             'GRANT_DATE', 'EXPIRY_DATE', 'TENURE', 'TERM', 'LOAN_TYPE', 
@@ -2113,7 +2111,6 @@ async def setup_sme_alert_rules():
         logger.error(f"Failed to setup SME alert rules: {e}")
         return {'success': False, 'error': str(e)}
 
-
 @app.post('/api/alerts/{alert_id}/escalate')
 async def escalate_alert_api(alert_id: str, request: Request):
     """Escalate an alert manually via API"""
@@ -2150,6 +2147,7 @@ async def dao_cases_page(request: Request):
 
     user_info = _require_roles(request, ['dao'])
     if not user_info:
+        
         return HTMLResponse('Forbidden', status_code=403)
 
     tpl = templates.env.get_template('dao_cases.html')
